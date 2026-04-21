@@ -6,6 +6,7 @@ import Link from 'next/link'
 
 export default function MyPage() {
   const [profile, setProfile] = useState<any>(null)
+  const [myRequests, setMyRequests] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -18,13 +19,31 @@ export default function MyPage() {
         return
       }
 
-      const { data } = await supabase
+      // プロフィール取得
+      const { data: profileData } = await supabase
         .from('users')
         .select('*')
         .eq('auth_id', user.id)
         .single()
 
-      setProfile(data || { display_name: user.user_metadata?.name || 'ユーザー' })
+      setProfile(profileData || { display_name: user.user_metadata?.name || 'ユーザー' })
+
+      // 自分の依頼一覧を取得
+      const { data: requests } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          title,
+          description,
+          status,
+          agreed_price,
+          created_at,
+          categories (name)
+        `)
+        .eq('client_id', profileData?.id || user.id)  // 念のため両方対応
+        .order('created_at', { ascending: false })
+
+      setMyRequests(requests || [])
       setLoading(false)
     }
 
@@ -43,7 +62,7 @@ export default function MyPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
-      <div className="max-w-2xl mx-auto px-4">
+      <div className="max-w-3xl mx-auto px-4">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">マイページ</h1>
           <button
@@ -67,7 +86,7 @@ export default function MyPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-4 mb-10">
             <Link
               href="/profile/edit"
               className="block w-full bg-black text-white text-center py-4 rounded-xl font-medium hover:bg-gray-800 transition"
@@ -75,7 +94,6 @@ export default function MyPage() {
               プロフィール編集
             </Link>
 
-            {/* 新しい依頼作成ボタン */}
             <Link
               href="/request/new"
               className="block w-full bg-blue-600 text-white text-center py-4 rounded-xl font-medium hover:bg-blue-700 transition"
@@ -85,9 +103,39 @@ export default function MyPage() {
           </div>
         </div>
 
-        <p className="text-center text-gray-500 text-sm">
-          ここに今後、依頼一覧や取引履歴などが追加されます。
-        </p>
+        {/* 依頼一覧セクション */}
+        <div className="bg-white rounded-2xl shadow p-8">
+          <h2 className="text-xl font-semibold mb-6">作成した依頼一覧</h2>
+
+          {myRequests.length === 0 ? (
+            <p className="text-gray-500 text-center py-8">まだ依頼を作成していません</p>
+          ) : (
+            <div className="space-y-4">
+              {myRequests.map((req) => (
+                <div key={req.id} className="border rounded-xl p-5 hover:bg-gray-50 transition">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-medium">{req.title}</p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {req.categories?.name} ・ {new Date(req.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className={`text-xs px-3 py-1 rounded-full ${
+                        req.status === 'draft' ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-700'
+                      }`}>
+                        {req.status === 'draft' ? '下書き' : '公開中'}
+                      </span>
+                    </div>
+                  </div>
+                  {req.agreed_price && (
+                    <p className="text-sm mt-3 text-blue-600">希望予算: ¥{req.agreed_price.toLocaleString()}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
