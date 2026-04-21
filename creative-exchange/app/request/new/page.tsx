@@ -24,7 +24,7 @@ export default function NewRequest() {
     loadCategories()
   }, [])
 
-    const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title || !description || !categoryId) {
       alert('タイトル、品目、依頼内容は必須です')
@@ -43,7 +43,7 @@ export default function NewRequest() {
     }
 
     try {
-      // 1. usersテーブルから users.id を取得（auth_idで検索）
+      // usersテーブルから id を取得
       const { data: profile, error: profileError } = await supabase
         .from('users')
         .select('id')
@@ -56,9 +56,9 @@ export default function NewRequest() {
         return
       }
 
-      // 2. ordersテーブルに挿入（client_idには users.id を使用）
+      // ordersに挿入
       const { error } = await supabase.from('orders').insert({
-        client_id: profile.id,                    // ← これが重要
+        client_id: profile.id,
         category_id: parseInt(categoryId),
         title: title.trim(),
         description: description.trim(),
@@ -68,42 +68,7 @@ export default function NewRequest() {
       })
 
       if (error) {
-        console.error('Orders insert error:', error)
-        alert('依頼作成失敗: ' + error.message)
-      } else {
-        alert('依頼を作成しました！')
-        router.push('/mypage')
-      }
-    } catch (err) {
-      console.error(err)
-      alert('予期せぬエラーが発生しました')
-    }
-
-    setSaving(false)
-  }
-
-    try {
-      // 1. まず users テーブルに確実にレコードを作成（これが重要）
-      await supabase.from('users').upsert({
-        auth_id: user.id,
-        display_name: user.user_metadata?.name || 'ユーザー',
-        twitter_handle: user.user_metadata?.preferred_username || null,
-        updated_at: new Date().toISOString()
-      })
-
-      // 2. その後 orders に挿入
-      const { error } = await supabase.from('orders').insert({
-        client_id: user.id,
-        category_id: parseInt(categoryId),
-        title: title.trim(),
-        description: description.trim(),
-        agreed_price: budget ? parseInt(budget) : null,
-        specification: { note: '基本依頼' },
-        status: 'draft'
-      })
-
-      if (error) {
-        console.error('Orders insert error:', error)
+        console.error('Insert error:', error)
         alert('依頼作成失敗: ' + error.message)
       } else {
         alert('依頼を作成しました！')
