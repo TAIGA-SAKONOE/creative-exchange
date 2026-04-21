@@ -31,7 +31,10 @@ export default function NewRequest() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title || !description || !categoryId) return
+    if (!title || !description || !categoryId) {
+      alert('タイトル、品目、依頼内容は必須です')
+      return
+    }
 
     setSaving(true)
 
@@ -43,6 +46,13 @@ export default function NewRequest() {
       return
     }
 
+    // specification に最低限の値を入れる（JSONB対応）
+    const specification = {
+      delivery_format: ['PNG'],     // 仮の値
+      max_revisions: 3,
+      commercial_use: true
+    }
+
     const { error } = await supabase
       .from('orders')
       .insert({
@@ -51,11 +61,13 @@ export default function NewRequest() {
         title,
         description,
         agreed_price: budget ? parseInt(budget) : null,
+        specification,                 // ← ここを追加
         status: 'draft'
       })
 
     if (error) {
       alert('依頼の作成に失敗しました: ' + error.message)
+      console.error(error)
     } else {
       alert('依頼を作成しました！')
       router.push('/mypage')
