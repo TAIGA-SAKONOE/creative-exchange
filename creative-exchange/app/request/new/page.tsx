@@ -42,12 +42,12 @@ export default function NewRequest() {
       return
     }
 
-    // シンプルに挿入
+    // シンプルに挿入（client_id を user.id で渡す）
     const { error } = await supabase.from('orders').insert({
       client_id: user.id,
       category_id: parseInt(categoryId),
-      title,
-      description,
+      title: title.trim(),
+      description: description.trim(),
       agreed_price: budget ? parseInt(budget) : null,
       specification: { note: '基本依頼' },
       status: 'draft'
@@ -74,12 +74,24 @@ export default function NewRequest() {
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow p-8 space-y-6">
           <div>
             <label className="block text-sm font-medium mb-2">依頼タイトル</label>
-            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full px-4 py-3 border rounded-xl" placeholder="依頼タイトル" required />
+            <input 
+              type="text" 
+              value={title} 
+              onChange={(e) => setTitle(e.target.value)} 
+              className="w-full px-4 py-3 border rounded-xl" 
+              placeholder="依頼タイトル" 
+              required 
+            />
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-2">品目</label>
-            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full px-4 py-3 border rounded-xl" required>
+            <select 
+              value={categoryId} 
+              onChange={(e) => setCategoryId(e.target.value)} 
+              className="w-full px-4 py-3 border rounded-xl" 
+              required
+            >
               <option value="">品目を選択</option>
               {categories.map(cat => (
                 <option key={cat.id} value={cat.id}>{cat.name}</option>
@@ -89,20 +101,40 @@ export default function NewRequest() {
 
           <div>
             <label className="block text-sm font-medium mb-2">依頼内容</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={5} className="w-full px-4 py-3 border rounded-xl" placeholder="依頼内容" required />
+            <textarea 
+              value={description} 
+              onChange={(e) => setDescription(e.target.value)} 
+              rows={5} 
+              className="w-full px-4 py-3 border rounded-xl" 
+              placeholder="依頼内容" 
+              required 
+            />
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-2">希望予算（任意）</label>
-            <input type="number" value={budget} onChange={(e) => setBudget(e.target.value)} className="w-full px-4 py-3 border rounded-xl" placeholder="例: 10000" />
+            <input 
+              type="number" 
+              value={budget} 
+              onChange={(e) => setBudget(e.target.value)} 
+              className="w-full px-4 py-3 border rounded-xl" 
+              placeholder="例: 10000" 
+            />
           </div>
 
-          <button type="submit" disabled={saving} className="w-full bg-blue-600 text-white py-4 rounded-xl font-medium hover:bg-blue-700 disabled:bg-gray-400">
+          <button 
+            type="submit" 
+            disabled={saving} 
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-medium disabled:bg-gray-400"
+          >
             {saving ? '作成中...' : '依頼を作成する'}
           </button>
         </form>
 
-        <button onClick={() => router.push('/mypage')} className="mt-8 text-gray-500 hover:text-gray-700">
+        <button 
+          onClick={() => router.push('/mypage')} 
+          className="mt-8 text-gray-500 hover:text-gray-700 block mx-auto"
+        >
           ← マイページに戻る
         </button>
       </div>
