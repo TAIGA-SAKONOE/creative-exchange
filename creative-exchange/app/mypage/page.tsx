@@ -19,7 +19,6 @@ export default function MyPage() {
         return
       }
 
-      // プロフィール取得
       const { data: profileData } = await supabase
         .from('users')
         .select('*')
@@ -28,7 +27,6 @@ export default function MyPage() {
 
       setProfile(profileData || { display_name: user.user_metadata?.name || 'ユーザー' })
 
-      // 自分の依頼一覧を取得
       const { data: requests } = await supabase
         .from('orders')
         .select(`
@@ -40,7 +38,7 @@ export default function MyPage() {
           created_at,
           categories (name)
         `)
-        .eq('client_id', profileData?.id || user.id)  // 念のため両方対応
+        .eq('client_id', profileData?.id)
         .order('created_at', { ascending: false })
 
       setMyRequests(requests || [])
@@ -103,7 +101,7 @@ export default function MyPage() {
           </div>
         </div>
 
-        {/* 依頼一覧セクション */}
+        {/* 依頼一覧 */}
         <div className="bg-white rounded-2xl shadow p-8">
           <h2 className="text-xl font-semibold mb-6">作成した依頼一覧</h2>
 
@@ -112,12 +110,16 @@ export default function MyPage() {
           ) : (
             <div className="space-y-4">
               {myRequests.map((req) => (
-                <div key={req.id} className="border rounded-xl p-5 hover:bg-gray-50 transition">
+                <Link 
+                  key={req.id} 
+                  href={`/request/${req.id}`}
+                  className="block border rounded-xl p-5 hover:bg-gray-50 transition group"
+                >
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="font-medium">{req.title}</p>
+                      <p className="font-medium group-hover:text-blue-600 transition">{req.title}</p>
                       <p className="text-sm text-gray-500 mt-1">
-                        {req.categories?.name} ・ {new Date(req.created_at).toLocaleDateString()}
+                        {req.categories?.name} ・ {new Date(req.created_at).toLocaleDateString('ja-JP')}
                       </p>
                     </div>
                     <div className="text-right">
@@ -131,7 +133,7 @@ export default function MyPage() {
                   {req.agreed_price && (
                     <p className="text-sm mt-3 text-blue-600">希望予算: ¥{req.agreed_price.toLocaleString()}</p>
                   )}
-                </div>
+                </Link>
               ))}
             </div>
           )}
