@@ -24,7 +24,7 @@ export default function NewRequest() {
     loadCategories()
   }, [])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title || !description || !categoryId) {
       alert('タイトル、品目、依頼内容は必須です')
@@ -41,6 +41,46 @@ export default function NewRequest() {
       router.push('/login')
       return
     }
+
+    try {
+      // 1. usersテーブルから users.id を取得（auth_idで検索）
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_id', user.id)
+        .single()
+
+      if (profileError || !profile) {
+        alert('プロフィールが見つかりません。先にプロフィール編集を完了してください。')
+        router.push('/profile/edit')
+        return
+      }
+
+      // 2. ordersテーブルに挿入（client_idには users.id を使用）
+      const { error } = await supabase.from('orders').insert({
+        client_id: profile.id,                    // ← これが重要
+        category_id: parseInt(categoryId),
+        title: title.trim(),
+        description: description.trim(),
+        agreed_price: budget ? parseInt(budget) : null,
+        specification: { note: '基本依頼' },
+        status: 'draft'
+      })
+
+      if (error) {
+        console.error('Orders insert error:', error)
+        alert('依頼作成失敗: ' + error.message)
+      } else {
+        alert('依頼を作成しました！')
+        router.push('/mypage')
+      }
+    } catch (err) {
+      console.error(err)
+      alert('予期せぬエラーが発生しました')
+    }
+
+    setSaving(false)
+  }
 
     try {
       // 1. まず users テーブルに確実にレコードを作成（これが重要）
