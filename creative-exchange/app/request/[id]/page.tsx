@@ -7,28 +7,40 @@ import { useRouter } from 'next/navigation'
 export default function RequestDetail({ params }: { params: { id: string } }) {
   const [request, setRequest] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
     const loadRequest = async () => {
       const supabase = createClient()
 
-      const { data } = await supabase
-        .from('orders')
-        .select(`
-          id,
-          title,
-          description,
-          agreed_price,
-          status,
-          created_at,
-          categories (name),
-          specification
-        `)
-        .eq('id', params.id)
-        .single()
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select(`
+            id,
+            title,
+            description,
+            agreed_price,
+            status,
+            created_at,
+            specification,
+            categories (name)
+          `)
+          .eq('id', params.id)
+          .single()
 
-      setRequest(data)
+        if (error) {
+          console.error('Request fetch error:', error)
+          setError('依頼の取得に失敗しました')
+        } else {
+          setRequest(data)
+        }
+      } catch (err) {
+        console.error(err)
+        setError('予期せぬエラーが発生しました')
+      }
+
       setLoading(false)
     }
 
@@ -36,6 +48,7 @@ export default function RequestDetail({ params }: { params: { id: string } }) {
   }, [params.id])
 
   if (loading) return <div className="p-12 text-center">読み込み中...</div>
+  if (error) return <div className="p-12 text-center text-red-600">{error}</div>
   if (!request) return <div className="p-12 text-center">依頼が見つかりません</div>
 
   return (
@@ -60,12 +73,12 @@ export default function RequestDetail({ params }: { params: { id: string } }) {
 
           <div className="mb-8">
             <p className="text-sm text-gray-500">品目</p>
-            <p className="text-lg">{request.categories?.name}</p>
+            <p className="text-lg font-medium">{request.categories?.name}</p>
           </div>
 
           <div className="mb-8">
             <p className="text-sm text-gray-500">依頼内容</p>
-            <p className="text-gray-700 whitespace-pre-wrap">{request.description}</p>
+            <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{request.description}</p>
           </div>
 
           {request.agreed_price && (
@@ -86,7 +99,7 @@ export default function RequestDetail({ params }: { params: { id: string } }) {
             </div>
           )}
 
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-gray-500 pt-4 border-t">
             作成日: {new Date(request.created_at).toLocaleDateString('ja-JP')}
           </div>
         </div>
