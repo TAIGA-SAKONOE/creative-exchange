@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
+  const next = requestUrl.searchParams.get('next') ?? '/mypage'
 
   if (code) {
     const cookieStore = await cookies()
@@ -23,16 +24,21 @@ export async function GET(request: Request) {
                 cookieStore.set(name, value, options)
               })
             } catch {
-              // Ignore
+              // Server Component から set できない場合は無視
             }
           },
         },
       }
     )
 
-    await supabase.auth.exchangeCodeForSession(code)
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+
+    if (!error) {
+      // 成功したらマイページへ
+      return NextResponse.redirect(new URL(next, requestUrl.origin))
+    }
   }
 
-  // ログイン成功後、マイページにリダイレクト
-  return NextResponse.redirect(new URL('/mypage', requestUrl.origin))
+  // 失敗時はログインページに戻す
+  return NextResponse.redirect(new URL('/login?error=auth_failed', requestUrl.origin))
 }
