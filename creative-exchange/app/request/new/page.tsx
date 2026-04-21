@@ -14,6 +14,7 @@ export default function NewRequest() {
   const [saving, setSaving] = useState(false)
   const router = useRouter()
 
+  // 品目一覧を取得
   useEffect(() => {
     const loadCategories = async () => {
       const supabase = createClient()
@@ -21,11 +22,9 @@ export default function NewRequest() {
         .from('categories')
         .select('*')
         .order('name')
-
       setCategories(data || [])
       setLoading(false)
     }
-
     loadCategories()
   }, [])
 
@@ -42,15 +41,9 @@ export default function NewRequest() {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
+      alert('ログインしてください')
       router.push('/login')
       return
-    }
-
-    // specification に最低限の値を入れる（JSONB対応）
-    const specification = {
-      delivery_format: ['PNG'],     // 仮の値
-      max_revisions: 3,
-      commercial_use: true
     }
 
     const { error } = await supabase
@@ -58,16 +51,16 @@ export default function NewRequest() {
       .insert({
         client_id: user.id,
         category_id: parseInt(categoryId),
-        title,
-        description,
+        title: title.trim(),
+        description: description.trim(),
         agreed_price: budget ? parseInt(budget) : null,
-        specification,                 // ← ここを追加
+        specification: { note: "依頼作成フォームから作成" }, // 必須カラム対策
         status: 'draft'
       })
 
     if (error) {
-      alert('依頼の作成に失敗しました: ' + error.message)
       console.error(error)
+      alert('依頼作成に失敗しました。\n' + error.message)
     } else {
       alert('依頼を作成しました！')
       router.push('/mypage')
@@ -76,7 +69,7 @@ export default function NewRequest() {
     setSaving(false)
   }
 
-  if (loading) return <div className="p-8 text-center">品目情報を読み込み中...</div>
+  if (loading) return <div className="p-12 text-center">読み込み中...</div>
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -90,7 +83,7 @@ export default function NewRequest() {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-black"
+              className="w-full px-4 py-3 border rounded-xl"
               placeholder="例: MV用一枚絵をお願いしたい"
               required
             />
@@ -101,7 +94,7 @@ export default function NewRequest() {
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-black"
+              className="w-full px-4 py-3 border rounded-xl"
               required
             >
               <option value="">品目を選択してください</option>
@@ -119,8 +112,8 @@ export default function NewRequest() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={6}
-              className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-black resize-y"
-              placeholder="詳細、希望納期、参考画像の説明などを書いてください"
+              className="w-full px-4 py-3 border rounded-xl resize-y"
+              placeholder="詳細や希望を書いてください"
               required
             />
           </div>
@@ -131,7 +124,7 @@ export default function NewRequest() {
               type="number"
               value={budget}
               onChange={(e) => setBudget(e.target.value)}
-              className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-black"
+              className="w-full px-4 py-3 border rounded-xl"
               placeholder="例: 15000"
             />
           </div>
@@ -139,7 +132,7 @@ export default function NewRequest() {
           <button
             type="submit"
             disabled={saving}
-            className="w-full bg-blue-600 text-white py-4 rounded-xl font-medium hover:bg-blue-700 disabled:bg-gray-400"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-medium disabled:bg-gray-400"
           >
             {saving ? '作成中...' : '依頼を作成する'}
           </button>
@@ -147,7 +140,7 @@ export default function NewRequest() {
 
         <button
           onClick={() => router.push('/mypage')}
-          className="mt-6 text-gray-500 hover:text-gray-700"
+          className="mt-8 text-gray-500 hover:text-gray-700 block mx-auto"
         >
           ← マイページに戻る
         </button>
