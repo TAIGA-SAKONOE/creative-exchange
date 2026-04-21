@@ -15,6 +15,7 @@ export default function RequestDetail({ params }: { params: { id: string } }) {
       const supabase = createClient()
 
       try {
+        // RLSを考慮して、自分の依頼か公開中の依頼を取得
         const { data, error } = await supabase
           .from('orders')
           .select(`
