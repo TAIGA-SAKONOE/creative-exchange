@@ -18,7 +18,6 @@ export default function MyPage() {
         return
       }
 
-      // usersテーブルからプロフィールを取得
       const { data } = await supabase
         .from('users')
         .select('*')
@@ -68,16 +67,26 @@ export default function MyPage() {
             </div>
           )}
 
-          <Link
-            href="/profile/edit"
-            className="block w-full bg-black text-white text-center py-4 rounded-xl font-medium hover:bg-gray-800 transition mb-4"
-          >
-            プロフィール編集
-          </Link>
+          <div className="grid grid-cols-1 gap-4">
+            <Link
+              href="/profile/edit"
+              className="block w-full bg-black text-white text-center py-4 rounded-xl font-medium hover:bg-gray-800 transition"
+            >
+              プロフィール編集
+            </Link>
+
+            {/* 新しい依頼作成ボタン */}
+            <Link
+              href="/request/new"
+              className="block w-full bg-blue-600 text-white text-center py-4 rounded-xl font-medium hover:bg-blue-700 transition"
+            >
+              新しい依頼を作成
+            </Link>
+          </div>
         </div>
 
         <p className="text-center text-gray-500 text-sm">
-          ここに今後、依頼作成や取引履歴などが追加されます。
+          ここに今後、依頼一覧や取引履歴などが追加されます。
         </p>
       </div>
     </div>
