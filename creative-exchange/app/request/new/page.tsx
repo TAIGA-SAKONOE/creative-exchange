@@ -42,22 +42,36 @@ export default function NewRequest() {
       return
     }
 
-    const { error } = await supabase.from('orders').insert({
-      client_id: user.id,
-      category_id: parseInt(categoryId),
-      title: title.trim(),
-      description: description.trim(),
-      agreed_price: budget ? parseInt(budget) : null,
-      specification: { note: '基本依頼' },
-      status: 'draft'
-    })
+    try {
+      // 1. まず users テーブルに確実にレコードを作成（これが重要）
+      await supabase.from('users').upsert({
+        auth_id: user.id,
+        display_name: user.user_metadata?.name || 'ユーザー',
+        twitter_handle: user.user_metadata?.preferred_username || null,
+        updated_at: new Date().toISOString()
+      })
 
-    if (error) {
-      console.error('Insert error:', error)
-      alert('依頼作成失敗: ' + error.message)
-    } else {
-      alert('依頼を作成しました！')
-      router.push('/mypage')
+      // 2. その後 orders に挿入
+      const { error } = await supabase.from('orders').insert({
+        client_id: user.id,
+        category_id: parseInt(categoryId),
+        title: title.trim(),
+        description: description.trim(),
+        agreed_price: budget ? parseInt(budget) : null,
+        specification: { note: '基本依頼' },
+        status: 'draft'
+      })
+
+      if (error) {
+        console.error('Orders insert error:', error)
+        alert('依頼作成失敗: ' + error.message)
+      } else {
+        alert('依頼を作成しました！')
+        router.push('/mypage')
+      }
+    } catch (err) {
+      console.error(err)
+      alert('予期せぬエラーが発生しました')
     }
 
     setSaving(false)
