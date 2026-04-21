@@ -18,21 +18,15 @@ export default function RequestDetail({ params }: { params: { id: string } }) {
         const { data, error } = await supabase
           .from('orders')
           .select(`
-            id,
-            title,
-            description,
-            agreed_price,
-            status,
-            created_at,
-            specification,
+            *,
             categories (name)
           `)
           .eq('id', params.id)
           .single()
 
         if (error) {
-          console.error('Request fetch error:', error)
-          setError('依頼の取得に失敗しました')
+          console.error('Fetch error:', error)
+          setError('この依頼は存在しないか、閲覧権限がありません')
         } else {
           setRequest(data)
         }
@@ -73,7 +67,7 @@ export default function RequestDetail({ params }: { params: { id: string } }) {
 
           <div className="mb-8">
             <p className="text-sm text-gray-500">品目</p>
-            <p className="text-lg font-medium">{request.categories?.name}</p>
+            <p className="text-lg font-medium">{request.categories?.name || '未分類'}</p>
           </div>
 
           <div className="mb-8">
