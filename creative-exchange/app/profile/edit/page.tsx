@@ -16,7 +16,6 @@ export default function ProfileEdit() {
     const loadProfile = async () => {
       const supabase = createClient()
       
-      // 現在のユーザー取得
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         router.push('/login')
@@ -24,7 +23,7 @@ export default function ProfileEdit() {
       }
       setUser(user)
 
-      // 既存のプロフィール情報を取得
+      // 既存プロフィールを取得
       const { data: profile } = await supabase
         .from('users')
         .select('*')
@@ -32,10 +31,9 @@ export default function ProfileEdit() {
         .single()
 
       if (profile) {
-        setDisplayName(profile.display_name || '')
+        setDisplayName(profile.display_name || user.user_metadata?.name || '')
         setBio(profile.bio || '')
       } else {
-        // 初回はauthのメタデータから名前を入れる
         setDisplayName(user.user_metadata?.name || '')
       }
 
@@ -61,6 +59,8 @@ export default function ProfileEdit() {
         bio: bio,
         twitter_handle: user.user_metadata?.preferred_username || null,
         updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'auth_id'   // ← これを追加（重要）
       })
 
     if (error) {
