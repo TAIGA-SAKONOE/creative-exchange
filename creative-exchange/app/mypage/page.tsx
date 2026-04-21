@@ -5,17 +5,31 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 export default function MyPage() {
-  const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const getUser = async () => {
+    const loadData = async () => {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
+
+      if (!user) {
+        window.location.href = '/login'
+        return
+      }
+
+      // usersテーブルからプロフィールを取得
+      const { data } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_id', user.id)
+        .single()
+
+      setProfile(data || { display_name: user.user_metadata?.name || 'ユーザー' })
       setLoading(false)
     }
-    getUser()
+
+    loadData()
   }, [])
 
   const handleLogout = async () => {
@@ -24,7 +38,9 @@ export default function MyPage() {
     window.location.href = '/login'
   }
 
-  if (loading) return <div>読み込み中...</div>
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">読み込み中...</div>
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -39,20 +55,28 @@ export default function MyPage() {
           </button>
         </div>
 
-        <div className="bg-white rounded-2xl shadow p-8">
-          <p className="text-2xl mb-2">ようこそ、{user?.user_metadata?.name || 'ユーザー'}さん</p>
-          <p className="text-gray-600 mb-8">Xアカウントでログイン済み</p>
+        <div className="bg-white rounded-2xl shadow p-8 mb-8">
+          <p className="text-2xl mb-2">
+            ようこそ、{profile?.display_name || 'ユーザー'}さん
+          </p>
+          <p className="text-gray-600 mb-6">Xアカウントでログイン済み</p>
 
-          {/* ここにプロフィール編集ボタンを追加 */}
+          {profile?.bio && (
+            <div className="mb-8">
+              <p className="text-sm text-gray-500 mb-1">自己紹介</p>
+              <p className="text-gray-700">{profile.bio}</p>
+            </div>
+          )}
+
           <Link
             href="/profile/edit"
-            className="block w-full bg-black text-white text-center py-4 rounded-xl font-medium hover:bg-gray-800 transition"
+            className="block w-full bg-black text-white text-center py-4 rounded-xl font-medium hover:bg-gray-800 transition mb-4"
           >
             プロフィール編集
           </Link>
         </div>
 
-        <p className="text-center text-gray-500 mt-12 text-sm">
+        <p className="text-center text-gray-500 text-sm">
           ここに今後、依頼作成や取引履歴などが追加されます。
         </p>
       </div>
