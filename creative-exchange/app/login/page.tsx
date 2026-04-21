@@ -7,7 +7,7 @@ export default function LoginPage() {
 
   const handleLogin = async () => {
     await supabase.auth.signInWithOAuth({
-      provider: 'twitter',
+      provider: 'x',
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
