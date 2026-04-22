@@ -19,11 +19,10 @@ export default function RequestDetail() {
     const loadData = async () => {
       const supabase = createClient()
 
-      // 現在のユーザー取得
+      // 現在のユーザー取得 → auth_id → users.id 変換
       const { data: { user } } = await supabase.auth.getUser()
 
       if (user) {
-        // auth_id → users.id 変換
         const { data: userProfile } = await supabase
           .from('users')
           .select('id')
@@ -55,12 +54,11 @@ export default function RequestDetail() {
     loadData()
   }, [id])
 
+  // 受注処理
   const handleAccept = async () => {
     if (!profile || !request) return
-
     const supabase = createClient()
 
-    // creator_id には users.id を使う（Auth IDではない）
     const { error: updateError } = await supabase
       .from('orders')
       .update({
@@ -71,26 +69,33 @@ export default function RequestDetail() {
       .eq('id', id)
 
     if (updateError) {
-      alert('受注に失敗しました: ' + updateError.message)
+      alert('受注失敗: ' + updateError.message)
     } else {
       alert('依頼を受注しました！')
       window.location.reload()
     }
   }
 
+  // 納品処理（今後実装）
+  const handleDeliver = async () => {
+    alert('納品機能は現在実装中です。')
+  }
+
   if (loading) return <div className="p-12 text-center">読み込み中...</div>
   if (error) return <div className="p-12 text-center text-red-600">{error}</div>
   if (!request) return <div className="p-12 text-center">依頼が見つかりません</div>
 
-  const isMyRequest = request.client_id === profile?.id
-  const canAccept = request.status === 'draft' && !isMyRequest
+  const isClient = request.client_id === profile?.id
+  const isCreator = request.creator_id === profile?.id
+  const canAccept = request.status === 'draft' && !isClient
+  const canDeliver = isCreator && request.status === 'matched'
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-3xl mx-auto px-4">
         <button
           onClick={() => router.push('/mypage')}
-          className="mb-6 text-gray-500 hover:text-gray-700 flex items-center gap-2"
+          className="mb-6 text-gray-500 hover:text-gray-700"
         >
           ← マイページに戻る
         </button>
@@ -103,10 +108,16 @@ export default function RequestDetail() {
                 ? 'bg-gray-100 text-gray-600'
                 : request.status === 'matched'
                 ? 'bg-green-100 text-green-700'
-                : 'bg-blue-100 text-blue-700'
+                : request.status === 'delivered'
+                ? 'bg-blue-100 text-blue-700'
+                : request.status === 'completed'
+                ? 'bg-purple-100 text-purple-700'
+                : 'bg-gray-100 text-gray-600'
             }`}>
               {request.status === 'draft' ? '公開中' :
                request.status === 'matched' ? '受注済み' :
+               request.status === 'delivered' ? '納品済み' :
+               request.status === 'completed' ? '完了' :
                request.status}
             </span>
           </div>
@@ -130,17 +141,27 @@ export default function RequestDetail() {
             </div>
           )}
 
+          {/* アクションボタン */}
           {canAccept && (
             <button
               onClick={handleAccept}
-              className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-medium text-lg mb-6"
+              className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-medium text-lg mb-4"
             >
               この依頼を受注する
             </button>
           )}
 
-          {isMyRequest && (
-            <p className="text-sm text-gray-400 text-center mb-6">
+          {canDeliver && (
+            <button
+              onClick={handleDeliver}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-medium text-lg mb-4"
+            >
+              納品する（ファイルアップロード）
+            </button>
+          )}
+
+          {isClient && request.status === 'draft' && (
+            <p className="text-sm text-gray-400 text-center mb-4">
               これはあなたが作成した依頼です
             </p>
           )}
