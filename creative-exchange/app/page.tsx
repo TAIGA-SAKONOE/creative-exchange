@@ -1,6 +1,5 @@
 'use client'
 
-import { createClient } from '../lib/supabase/client'
 import Link from 'next/link'
 
 export default function HomePage() {
@@ -34,7 +33,7 @@ export default function HomePage() {
             <div className="space-y-4">
               <div>
                 <span className="text-gray-600">ログイン中:</span>
-                <span className="ml-2 font-medium">nagasa...@gmail.com</span>
+                <span className="ml-2 font-medium">Xアカウントでログイン済み</span>
               </div>
               <Link href="/mypage">
                 <button className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-medium">
@@ -45,22 +44,8 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* ★ ここに相場ボードへの導線を追加 */}
-        <div className="mt-12 text-center">
-          <Link href="/market">
-            <button className="inline-flex items-center gap-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-10 py-5 rounded-2xl font-medium text-xl shadow-lg hover:shadow-xl transition-all">
-              相場ボードを見る
-              <span className="text-2xl">📊</span>
-            </button>
-          </Link>
-          <p className="mt-4 text-gray-500">最新のクリエイティブ制作相場を確認できます</p>
-        </div>
-
-        {/* 既存のマイページリンク（小さく残す） */}
-        <div className="mt-8 text-center">
-          <Link href="/mypage" className="text-blue-600 hover:underline">
-            マイページへ移動する
-          </Link>
+        <div className="mt-12 text-center text-sm text-gray-500">
+          サブカルチャークリエイターのための取引市場
         </div>
       </div>
     </div>
