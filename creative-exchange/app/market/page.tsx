@@ -12,7 +12,6 @@ export default function MarketPage() {
     const fetchMarketData = async () => {
       const supabase = createClient()
 
-      // categoriesを取得し、各品目の相場を計算
       const { data: categories, error } = await supabase
         .from('categories')
         .select('*')
@@ -24,13 +23,12 @@ export default function MarketPage() {
         return
       }
 
-      // 各カテゴリの相場データを取得（calculate_market_stats関数を使用）
       const results = []
       for (const category of categories || []) {
         const { data: stats } = await supabase
           .rpc('calculate_market_stats', {
             p_category_id: category.id,
-            p_days: 90   // 直近90日間のデータ
+            p_days: 90
           })
 
         results.push({
