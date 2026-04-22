@@ -65,7 +65,7 @@ export default function RequestDetail() {
       .from('orders')
       .update({
         creator_id: profile.id,
-        status: 'accepted',
+        status: 'matched',
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
@@ -101,12 +101,12 @@ export default function RequestDetail() {
             <span className={`px-4 py-1 rounded-full text-sm ${
               request.status === 'draft'
                 ? 'bg-gray-100 text-gray-600'
-                : request.status === 'accepted'
+                : request.status === 'matched'
                 ? 'bg-green-100 text-green-700'
                 : 'bg-blue-100 text-blue-700'
             }`}>
               {request.status === 'draft' ? '公開中' :
-               request.status === 'accepted' ? '受注済み' :
+               request.status === 'matched' ? '受注済み' :
                request.status}
             </span>
           </div>
