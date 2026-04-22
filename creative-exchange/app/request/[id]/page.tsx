@@ -107,7 +107,7 @@ export default function RequestDetail() {
 
   const canAccept = request.status === 'draft' && !isClient
   const canDeliver = isCreator && request.status === 'matched'
-  const canComplete = isClient   // ← テスト用に依頼者なら常に表示
+  const canComplete = isClient   // テスト用：依頼者なら常に検収ボタンを表示
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -154,8 +154,10 @@ export default function RequestDetail() {
           )}
 
           {canAccept && (
-            <button onClick={() => alert('受注は既に動作確認済みです')} 
-              className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-medium mb-4">
+            <button 
+              onClick={() => alert('受注は既に動作確認済みです')} 
+              className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-medium mb-4"
+            >
               この依頼を受注する
             </button>
           )}
@@ -175,8 +177,20 @@ export default function RequestDetail() {
             </label>
           )}
 
-          {/* 検収ボタン（テスト用に依頼者なら常に表示） */}
           {canComplete && (
             <button
               onClick={handleComplete}
-              className="w-full bg-purple-600 hover:bg-purple-700
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-xl font-medium text-lg"
+            >
+              検収OK（取引完了）
+            </button>
+          )}
+
+          <div className="text-sm text-gray-500 mt-8 pt-4 border-t">
+            作成日: {new Date(request.created_at).toLocaleDateString('ja-JP')}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
