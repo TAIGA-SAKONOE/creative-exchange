@@ -68,11 +68,6 @@ export default function ReviewPage() {
         ? request.creator_id 
         : request.client_id
 
-      // 自分自身を評価しようとしていないかチェック
-     //  if (profile.id === revieweeId) {
-       //  throw new Error('自分自身を評価することはできません')
-     //  }
-
       const { error } = await supabase
         .from('reviews')
         .insert({
