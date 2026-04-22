@@ -19,7 +19,6 @@ export default function MyPage() {
         return
       }
 
-      // 自分のプロフィール取得
       const { data: profile } = await supabase
         .from('users')
         .select('*')
@@ -29,7 +28,6 @@ export default function MyPage() {
       if (profile) {
         setUser(profile)
 
-        // 自分の依頼一覧取得
         const { data: myRequests } = await supabase
           .from('orders')
           .select(`
@@ -48,13 +46,8 @@ export default function MyPage() {
     loadMyPage()
   }, [])
 
-  if (loading) {
-    return <div className="p-12 text-center">読み込み中...</div>
-  }
-
-  if (!user) {
-    return <div>ログインしてください</div>
-  }
+  if (loading) return <div className="p-12 text-center">読み込み中...</div>
+  if (!user) return <div>ログインしてください</div>
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -82,16 +75,24 @@ export default function MyPage() {
             </div>
           </div>
 
-          <div className="mt-8 flex gap-4">
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
             <Link
               href={`/creator/${user.id}`}
-              className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-4 rounded-2xl font-medium text-center hover:brightness-110 transition"
+              className="bg-gradient-to-r from-purple-600 to-blue-600 text-white py-4 rounded-2xl font-medium text-center hover:brightness-110 transition flex items-center justify-center gap-2"
             >
               📊 自分の価格表を見る
             </Link>
+
+            <Link
+              href="/market"
+              className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-2xl font-medium text-center hover:brightness-110 transition flex items-center justify-center gap-2"
+            >
+              📈 相場ボードを見る
+            </Link>
+
             <Link
               href="/profile/edit"
-              className="flex-1 border border-gray-300 hover:bg-gray-50 py-4 rounded-2xl font-medium text-center transition"
+              className="border border-gray-300 hover:bg-gray-50 py-4 rounded-2xl font-medium text-center transition"
             >
               プロフィール編集
             </Link>
