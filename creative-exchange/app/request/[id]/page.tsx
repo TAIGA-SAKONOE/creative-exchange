@@ -46,7 +46,7 @@ export default function RequestDetail() {
   const handleDeliver = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !currentUser || !request) {
-      alert('ファイルが選択されていません')
+      alert('ファイルを選択してください')
       return
     }
 
@@ -60,18 +60,19 @@ export default function RequestDetail() {
     const supabase = createClient()
 
     try {
-      // ファイル名作成
-      const fileExt = file.name.split('.').pop() || 'png'
-      const filePath = `${id}/${Date.now()}-${file.name}`
+      // 安全なファイル名を作成（日本語を避ける）
+      const fileExt = file.name.split('.').pop() || 'pdf'
+      const safeFileName = `${Date.now()}.${fileExt}`
+      const filePath = `${id}/${safeFileName}`   // order_id/タイムスタンプ.拡張子
 
       // Storageにアップロード
       const { error: uploadError } = await supabase.storage
         .from('deliverables')
         .upload(filePath, file)
 
-      if (uploadError) throw uploadError
+      if (uploadError) throw new Error(uploadError.message)
 
-      // ステータスを 'delivered' に更新（一旦強制）
+      // ステータスを 'delivered' に更新
       const { error: updateError } = await supabase
         .from('orders')
         .update({ 
@@ -90,8 +91,7 @@ export default function RequestDetail() {
       alert('納品に失敗しました: ' + (err.message || '不明なエラー'))
     } finally {
       setUploading(false)
-      // ファイル入力のリセット
-      e.target.value = ''
+      e.target.value = ''  // 入力リセット
     }
   }
 
@@ -103,8 +103,7 @@ export default function RequestDetail() {
   const isCreator = request.creator_id === currentUser?.id
 
   const canAccept = request.status === 'draft' && !isClient
-  // テスト用に条件を緩めています（本番では isCreator && status === 'matched' に戻す）
-  const canDeliver = isCreator || request.status === 'matched'
+  const canDeliver = isCreator || request.status === 'matched'   // テスト用緩め
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -164,7 +163,7 @@ export default function RequestDetail() {
                 onChange={handleDeliver}
                 disabled={uploading}
                 className="hidden"
-                accept="image/*,.pdf,.zip"
+                accept="image/*,.pdf,.zip,.psd"
               />
               <div className={`w-full py-4 rounded-xl font-medium text-center text-white ${
                 uploading 
