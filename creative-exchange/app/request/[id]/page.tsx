@@ -56,8 +56,8 @@ export default function RequestDetail() {
 
   const handleDeliver = async (e: React.ChangeEvent<HTMLInputElement>) => { /* 省略 */ }
 
-  const handleComplete = async () => {
-    if (!profile) return
+    const handleComplete = async () => {
+    if (!currentUser) return
 
     const supabase = createClient()
 
@@ -74,6 +74,7 @@ export default function RequestDetail() {
       alert('検収処理に失敗しました: ' + error.message)
     } else {
       alert('取引が完了しました！')
+      // 確実に最新データを再取得するために強制リロード
       window.location.reload()
     }
   }
