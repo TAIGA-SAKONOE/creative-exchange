@@ -60,8 +60,7 @@ export default function RequestDetail({ params }: { params: { id: string } }) {
       alert('受注に失敗しました: ' + error.message)
     } else {
       alert('依頼を受注しました！')
-      // ページをリロードして最新状態を表示
-      window.location.reload()
+      window.location.reload()   // ページをリロードして最新状態を表示
     }
   }
 
@@ -70,7 +69,8 @@ export default function RequestDetail({ params }: { params: { id: string } }) {
   if (!request) return <div className="p-12 text-center">依頼が見つかりません</div>
 
   const isMyRequest = request.client_id === currentUser?.id
-  const canAccept = !isMyRequest && request.status === 'draft'
+  // テスト用：自分の依頼でも受注ボタンを表示（本番では !isMyRequest を戻す）
+  const canAccept = request.status === 'draft'
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
