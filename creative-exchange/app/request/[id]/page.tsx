@@ -99,7 +99,7 @@ export default function RequestDetail() {
   const isClient = request.client_id === currentUser?.id
   const isCreator = request.creator_id === currentUser?.id
   const canAccept = request.status === 'draft' && !isClient
-  const canDeliver = isCreator && request.status === 'matched'
+  const canDeliver = isCreator || request.status === 'matched'
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
