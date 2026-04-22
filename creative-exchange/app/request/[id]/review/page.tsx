@@ -54,7 +54,6 @@ export default function ReviewPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('ログインしてください')
 
-      // Auth ID → users.id 変換
       const { data: profile } = await supabase
         .from('users')
         .select('id')
@@ -64,9 +63,15 @@ export default function ReviewPage() {
       if (!profile) throw new Error('ユーザー情報が見つかりません')
 
       // 評価対象者（相手）を特定
-      const revieweeId = request.client_id === profile.id 
-        ? request.creator_id 
-        : request.client_id
+      let revieweeId = request.creator_id
+      if (profile.id === request.creator_id) {
+        revieweeId = request.client_id
+      }
+
+      // 念のため自分自身を評価しようとしていないか確認
+      if (profile.id === revieweeId) {
+        throw new Error('自分自身を評価することはできません')
+      }
 
       const { error } = await supabase
         .from('reviews')
@@ -84,6 +89,7 @@ export default function ReviewPage() {
       router.push(`/request/${id}`)
 
     } catch (err: any) {
+      console.error(err)
       alert('評価の保存に失敗しました: ' + (err.message || '不明なエラー'))
     } finally {
       setSubmitting(false)
