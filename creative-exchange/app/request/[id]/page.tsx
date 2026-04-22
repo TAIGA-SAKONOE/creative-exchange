@@ -3,6 +3,7 @@
 import { createClient } from '../../../lib/supabase/client'
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import Link from 'next/link'
 
 export default function RequestDetail() {
   const params = useParams()
@@ -12,7 +13,7 @@ export default function RequestDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentUser, setCurrentUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)   // ← 追加
+  const [profile, setProfile] = useState<any>(null)
   const [uploading, setUploading] = useState(false)
   const router = useRouter()
 
@@ -23,7 +24,6 @@ export default function RequestDetail() {
       const { data: { user } } = await supabase.auth.getUser()
       setCurrentUser(user)
 
-      // ★ 重要：Auth ID → users.id の変換を確実に行う
       if (user) {
         const { data: userProfile } = await supabase
           .from('users')
@@ -54,11 +54,42 @@ export default function RequestDetail() {
     loadData()
   }, [id])
 
-  const handleDeliver = async (e: React.ChangeEvent<HTMLInputElement>) => { /* 省略 */ }
+  const handleDeliver = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !currentUser || !request) return
 
-    const handleComplete = async () => {
-    if (!currentUser) return
+    setUploading(true)
+    const supabase = createClient()
 
+    try {
+      const fileExt = file.name.split('.').pop() || 'pdf'
+      const safeFileName = `${Date.now()}.${fileExt}`
+      const filePath = `${id}/${safeFileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('deliverables')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ status: 'delivered', updated_at: new Date().toISOString() })
+        .eq('id', id)
+
+      if (updateError) throw updateError
+
+      alert('納品が完了しました！')
+      window.location.reload()
+    } catch (err: any) {
+      alert('納品に失敗しました: ' + err.message)
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  const handleComplete = async () => {
     const supabase = createClient()
 
     const { error } = await supabase
@@ -74,7 +105,6 @@ export default function RequestDetail() {
       alert('検収処理に失敗しました: ' + error.message)
     } else {
       alert('取引が完了しました！')
-      // 確実に最新データを再取得するために強制リロード
       window.location.reload()
     }
   }
@@ -83,12 +113,13 @@ export default function RequestDetail() {
   if (error) return <div className="p-12 text-center text-red-600">{error}</div>
   if (!request) return <div className="p-12 text-center">依頼が見つかりません</div>
 
-  const isClient = request.client_id === profile?.id   // ← ここをprofile.idに変更
+  const isClient = request.client_id === profile?.id
   const isCreator = request.creator_id === profile?.id
 
   const canAccept = request.status === 'draft' && !isClient
   const canDeliver = isCreator && request.status === 'matched'
-  const canComplete = isClient   // 依頼者なら検収ボタンを表示
+  const canComplete = isClient && request.status === 'delivered'
+  const canReview = (isClient || isCreator) && request.status === 'completed'
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -107,11 +138,12 @@ export default function RequestDetail() {
               request.status === 'draft' ? 'bg-gray-100 text-gray-600' : 
               request.status === 'matched' ? 'bg-green-100 text-green-700' : 
               request.status === 'delivered' ? 'bg-blue-100 text-blue-700' :
-              'bg-purple-100 text-purple-700'
+              request.status === 'completed' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'
             }`}>
               {request.status === 'draft' ? '募集中' : 
                request.status === 'matched' ? '受注済み' : 
-               request.status === 'delivered' ? '納品済み' : '完了'}
+               request.status === 'delivered' ? '納品済み' : 
+               request.status === 'completed' ? '完了' : request.status}
             </span>
           </div>
 
@@ -159,10 +191,19 @@ export default function RequestDetail() {
           {canComplete && (
             <button
               onClick={handleComplete}
-              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-xl font-medium text-lg mt-4"
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-xl font-medium text-lg mb-4"
             >
               検収OK（取引完了）
             </button>
+          )}
+
+          {/* 工程2：評価ボタン */}
+          {canReview && (
+            <Link href={`/request/${id}/review`}>
+              <button className="w-full bg-amber-600 hover:bg-amber-700 text-white py-4 rounded-xl font-medium text-lg">
+                評価する
+              </button>
+            </Link>
           )}
 
           <div className="text-sm text-gray-500 mt-8 pt-4 border-t">
