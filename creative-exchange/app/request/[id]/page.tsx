@@ -83,7 +83,7 @@ export default function RequestDetail() {
   if (!request) return <div className="p-12 text-center">依頼が見つかりません</div>
 
   const isMyRequest = request.client_id === profile?.id
-  const canAccept = request.status === 'draft' && !isMyRequest
+  const canAccept = request.status === 'draft'
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
