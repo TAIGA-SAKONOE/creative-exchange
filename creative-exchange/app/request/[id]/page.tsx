@@ -2,33 +2,35 @@
 
 import { createClient } from '../../../lib/supabase/client'
 import { useEffect, useState } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 
-export default function RequestDetail() {
-  const params = useParams()
-  const id = params.id as string
+export default function RequestDetail({ params }: { params: { id: string } }) {
   const [request, setRequest] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentUser, setCurrentUser] = useState<any>(null)
   const router = useRouter()
 
   useEffect(() => {
-    if (!id) return
-
-    const loadRequest = async () => {
+    const loadData = async () => {
       const supabase = createClient()
 
-      const { data, error: orderError } = await supabase
+      // 現在のユーザー取得
+      const { data: { user } } = await supabase.auth.getUser()
+      setCurrentUser(user)
+
+      // 依頼詳細取得
+      const { data, error } = await supabase
         .from('orders')
         .select(`
           *,
           categories (name)
         `)
-        .eq('id', id)
+        .eq('id', params.id)
         .single()
 
-      if (orderError) {
-        console.error('Fetch error:', orderError)
+      if (error) {
+        console.error('Fetch error:', error)
         setError('この依頼は存在しないか、閲覧権限がありません')
       } else {
         setRequest(data)
@@ -37,12 +39,38 @@ export default function RequestDetail() {
       setLoading(false)
     }
 
-    loadRequest()
-  }, [id])
+    loadData()
+  }, [params.id])
+
+  const handleAccept = async () => {
+    if (!currentUser || !request) return
+
+    const supabase = createClient()
+
+    const { error } = await supabase
+      .from('orders')
+      .update({
+        creator_id: currentUser.id,
+        status: 'accepted',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', params.id)
+
+    if (error) {
+      alert('受注に失敗しました: ' + error.message)
+    } else {
+      alert('依頼を受注しました！')
+      // ページをリロードして最新状態を表示
+      window.location.reload()
+    }
+  }
 
   if (loading) return <div className="p-12 text-center">読み込み中...</div>
   if (error) return <div className="p-12 text-center text-red-600">{error}</div>
   if (!request) return <div className="p-12 text-center">依頼が見つかりません</div>
+
+  const isMyRequest = request.client_id === currentUser?.id
+  const canAccept = !isMyRequest && request.status === 'draft'
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -60,7 +88,7 @@ export default function RequestDetail() {
             <span className={`px-4 py-1 rounded-full text-sm ${
               request.status === 'draft' ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-700'
             }`}>
-              {request.status === 'draft' ? '下書き' : '公開中'}
+              {request.status === 'draft' ? '下書き' : '受注済み'}
             </span>
           </div>
 
@@ -81,6 +109,15 @@ export default function RequestDetail() {
                 ¥{request.agreed_price.toLocaleString()}
               </p>
             </div>
+          )}
+
+          {canAccept && (
+            <button
+              onClick={handleAccept}
+              className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-medium text-lg mb-6"
+            >
+              この依頼を受注する
+            </button>
           )}
 
           <div className="text-sm text-gray-500 pt-4 border-t">
