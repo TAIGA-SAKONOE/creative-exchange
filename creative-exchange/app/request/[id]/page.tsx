@@ -107,7 +107,17 @@ export default function RequestDetail() {
 
   const canAccept = request.status === 'draft' && !isClient
   const canDeliver = isCreator && request.status === 'matched'
-  const canComplete = isClient   // テスト用：依頼者なら常に検収ボタンを表示
+  const canComplete = isClient   // テスト用：依頼者なら常に表示
+
+  // デバッグ情報（画面に表示）
+  console.log('Debug Info:', {
+    isClient,
+    isCreator,
+    status: request.status,
+    client_id: request.client_id,
+    currentUserId: currentUser?.id,
+    canComplete
+  })
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -180,13 +190,20 @@ export default function RequestDetail() {
           {canComplete && (
             <button
               onClick={handleComplete}
-              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-xl font-medium text-lg"
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-xl font-medium text-lg mt-4"
             >
               検収OK（取引完了）
             </button>
           )}
 
-          <div className="text-sm text-gray-500 mt-8 pt-4 border-t">
+          {/* デバッグ情報表示 */}
+          <div className="mt-8 p-4 bg-gray-100 rounded text-xs text-gray-600">
+            <p>Debug: isClient = {isClient ? 'true' : 'false'}</p>
+            <p>Debug: status = {request.status}</p>
+            <p>Debug: canComplete = {canComplete ? 'true' : 'false'}</p>
+          </div>
+
+          <div className="text-sm text-gray-500 mt-4 pt-4 border-t">
             作成日: {new Date(request.created_at).toLocaleDateString('ja-JP')}
           </div>
         </div>
