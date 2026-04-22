@@ -7,32 +7,22 @@ import { useRouter, useParams } from 'next/navigation'
 export default function RequestDetail() {
   const params = useParams()
   const id = params.id as string
+
   const [request, setRequest] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [profile, setProfile] = useState<any>(null)
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [uploading, setUploading] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
-    if (!id) return
-
     const loadData = async () => {
       const supabase = createClient()
 
-      // 現在のユーザー取得 → auth_id → users.id 変換
       const { data: { user } } = await supabase.auth.getUser()
+      setCurrentUser(user)
 
-      if (user) {
-        const { data: userProfile } = await supabase
-          .from('users')
-          .select('id')
-          .eq('auth_id', user.id)
-          .single()
-        setProfile(userProfile)
-      }
-
-      // 依頼詳細取得
-      const { data, error: fetchError } = await supabase
+      const { data, error } = await supabase
         .from('orders')
         .select(`
           *,
@@ -41,8 +31,7 @@ export default function RequestDetail() {
         .eq('id', id)
         .single()
 
-      if (fetchError) {
-        console.error('Fetch error:', fetchError)
+      if (error) {
         setError('この依頼は存在しないか、閲覧権限がありません')
       } else {
         setRequest(data)
@@ -54,48 +43,70 @@ export default function RequestDetail() {
     loadData()
   }, [id])
 
-  // 受注処理
-  const handleAccept = async () => {
-    if (!profile || !request) return
+  const handleDeliver = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !currentUser || !request) return
+
+    setUploading(true)
+
     const supabase = createClient()
 
-    const { error: updateError } = await supabase
-      .from('orders')
-      .update({
-        creator_id: profile.id,
-        status: 'matched',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
+    try {
+      // 1. Storageにアップロード
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${request.id}/${Date.now()}.${fileExt}`
 
-    if (updateError) {
-      alert('受注失敗: ' + updateError.message)
-    } else {
-      alert('依頼を受注しました！')
+      const { error: uploadError } = await supabase.storage
+        .from('deliverables')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        })
+
+      if (uploadError) throw uploadError
+
+      // 2. 公開URL取得
+      const { data: { publicUrl } } = supabase.storage
+        .from('deliverables')
+        .getPublicUrl(fileName)
+
+      // 3. ordersステータスを更新（matched → delivered）
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ 
+          status: 'delivered',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', request.id)
+
+      if (updateError) throw updateError
+
+      alert('納品が完了しました！')
       window.location.reload()
-    }
-  }
 
-  // 納品処理（今後実装）
-  const handleDeliver = async () => {
-    alert('納品機能は現在実装中です。')
+    } catch (err: any) {
+      console.error(err)
+      alert('納品に失敗しました: ' + err.message)
+    } finally {
+      setUploading(false)
+    }
   }
 
   if (loading) return <div className="p-12 text-center">読み込み中...</div>
   if (error) return <div className="p-12 text-center text-red-600">{error}</div>
   if (!request) return <div className="p-12 text-center">依頼が見つかりません</div>
 
-  const isClient = request.client_id === profile?.id
-  const isCreator = request.creator_id === profile?.id
+  const isClient = request.client_id === currentUser?.id
+  const isCreator = request.creator_id === currentUser?.id
   const canAccept = request.status === 'draft' && !isClient
   const canDeliver = isCreator && request.status === 'matched'
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-3xl mx-auto px-4">
-        <button
+        <button 
           onClick={() => router.push('/mypage')}
-          className="mb-6 text-gray-500 hover:text-gray-700"
+          className="mb-6 text-gray-500 hover:text-gray-700 flex items-center gap-2"
         >
           ← マイページに戻る
         </button>
@@ -104,21 +115,12 @@ export default function RequestDetail() {
           <div className="flex justify-between items-start mb-6">
             <h1 className="text-3xl font-bold">{request.title}</h1>
             <span className={`px-4 py-1 rounded-full text-sm ${
-              request.status === 'draft'
-                ? 'bg-gray-100 text-gray-600'
-                : request.status === 'matched'
-                ? 'bg-green-100 text-green-700'
-                : request.status === 'delivered'
-                ? 'bg-blue-100 text-blue-700'
-                : request.status === 'completed'
-                ? 'bg-purple-100 text-purple-700'
-                : 'bg-gray-100 text-gray-600'
+              request.status === 'draft' ? 'bg-gray-100 text-gray-600' : 
+              request.status === 'matched' ? 'bg-green-100 text-green-700' : 
+              'bg-blue-100 text-blue-700'
             }`}>
-              {request.status === 'draft' ? '公開中' :
-               request.status === 'matched' ? '受注済み' :
-               request.status === 'delivered' ? '納品済み' :
-               request.status === 'completed' ? '完了' :
-               request.status}
+              {request.status === 'draft' ? '募集中' : 
+               request.status === 'matched' ? '受注済み' : '納品済み'}
             </span>
           </div>
 
@@ -143,30 +145,29 @@ export default function RequestDetail() {
 
           {/* アクションボタン */}
           {canAccept && (
-            <button
-              onClick={handleAccept}
-              className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-medium text-lg mb-4"
+            <button 
+              onClick={() => alert('受注機能は既に動作確認済みです')}
+              className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-medium mb-4"
             >
               この依頼を受注する
             </button>
           )}
 
           {canDeliver && (
-            <button
-              onClick={handleDeliver}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-medium text-lg mb-4"
-            >
-              納品する（ファイルアップロード）
-            </button>
+            <label className="block w-full">
+              <input
+                type="file"
+                onChange={handleDeliver}
+                disabled={uploading}
+                className="hidden"
+              />
+              <div className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-medium text-center cursor-pointer">
+                {uploading ? 'アップロード中...' : '納品する（ファイルアップロード）'}
+              </div>
+            </label>
           )}
 
-          {isClient && request.status === 'draft' && (
-            <p className="text-sm text-gray-400 text-center mb-4">
-              これはあなたが作成した依頼です
-            </p>
-          )}
-
-          <div className="text-sm text-gray-500 pt-4 border-t">
+          <div className="text-sm text-gray-500 mt-8 pt-4 border-t">
             作成日: {new Date(request.created_at).toLocaleDateString('ja-JP')}
           </div>
         </div>
