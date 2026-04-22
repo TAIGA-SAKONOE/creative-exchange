@@ -43,55 +43,62 @@ export default function RequestDetail() {
     loadData()
   }, [id])
 
+  // 納品処理（前回修正版を維持）
   const handleDeliver = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file || !currentUser || !request) {
-      alert('ファイルを選択してください')
-      return
-    }
-
-    if (request.status !== 'matched') {
-      alert('受注済みの依頼のみ納品できます')
-      return
-    }
+    if (!file || !currentUser || !request) return
 
     setUploading(true)
-
     const supabase = createClient()
 
     try {
-      // 安全なファイル名を作成（日本語を避ける）
       const fileExt = file.name.split('.').pop() || 'pdf'
       const safeFileName = `${Date.now()}.${fileExt}`
-      const filePath = `${id}/${safeFileName}`   // order_id/タイムスタンプ.拡張子
+      const filePath = `${id}/${safeFileName}`
 
-      // Storageにアップロード
       const { error: uploadError } = await supabase.storage
         .from('deliverables')
         .upload(filePath, file)
 
-      if (uploadError) throw new Error(uploadError.message)
+      if (uploadError) throw uploadError
 
-      // ステータスを 'delivered' に更新
       const { error: updateError } = await supabase
         .from('orders')
-        .update({ 
-          status: 'delivered',
-          updated_at: new Date().toISOString()
-        })
+        .update({ status: 'delivered', updated_at: new Date().toISOString() })
         .eq('id', id)
 
       if (updateError) throw updateError
 
       alert('納品が完了しました！')
       window.location.reload()
-
     } catch (err: any) {
-      console.error('納品エラー:', err)
-      alert('納品に失敗しました: ' + (err.message || '不明なエラー'))
+      alert('納品に失敗しました: ' + err.message)
     } finally {
       setUploading(false)
-      e.target.value = ''  // 入力リセット
+      e.target.value = ''
+    }
+  }
+
+  // ★ 工程1：検収処理（Claude指示通り追加）
+  const handleComplete = async () => {
+    if (!currentUser || !request) return
+
+    const supabase = createClient()
+
+    const { error } = await supabase
+      .from('orders')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+
+    if (error) {
+      alert('検収処理に失敗しました: ' + error.message)
+    } else {
+      alert('取引が完了しました！')
+      window.location.reload()
     }
   }
 
@@ -103,7 +110,8 @@ export default function RequestDetail() {
   const isCreator = request.creator_id === currentUser?.id
 
   const canAccept = request.status === 'draft' && !isClient
-  const canDeliver = isCreator || request.status === 'matched'   // テスト用緩め
+  const canDeliver = isCreator && request.status === 'matched'
+  const canComplete = isClient && request.status === 'delivered'   // ← 工程1追加
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -121,13 +129,16 @@ export default function RequestDetail() {
             <span className={`px-4 py-1 rounded-full text-sm ${
               request.status === 'draft' ? 'bg-gray-100 text-gray-600' : 
               request.status === 'matched' ? 'bg-green-100 text-green-700' : 
-              'bg-blue-100 text-blue-700'
+              request.status === 'delivered' ? 'bg-blue-100 text-blue-700' :
+              'bg-purple-100 text-purple-700'
             }`}>
               {request.status === 'draft' ? '募集中' : 
-               request.status === 'matched' ? '受注済み' : '納品済み'}
+               request.status === 'matched' ? '受注済み' : 
+               request.status === 'delivered' ? '納品済み' : '完了'}
             </span>
           </div>
 
+          {/* 依頼情報表示（省略せず） */}
           <div className="mb-8">
             <p className="text-sm text-gray-500">品目</p>
             <p className="text-lg font-medium">{request.categories?.name || '未分類'}</p>
@@ -147,11 +158,10 @@ export default function RequestDetail() {
             </div>
           )}
 
+          {/* アクションボタンエリア */}
           {canAccept && (
-            <button 
-              onClick={() => alert('受注は既に動作確認済みです')}
-              className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-medium mb-4"
-            >
+            <button onClick={() => alert('受注は既に動作確認済みです')} 
+              className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-medium mb-4">
               この依頼を受注する
             </button>
           )}
@@ -163,16 +173,22 @@ export default function RequestDetail() {
                 onChange={handleDeliver}
                 disabled={uploading}
                 className="hidden"
-                accept="image/*,.pdf,.zip,.psd"
+                accept="image/*,.pdf,.zip"
               />
-              <div className={`w-full py-4 rounded-xl font-medium text-center text-white ${
-                uploading 
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-blue-600 hover:bg-blue-700'
-              }`}>
+              <div className={`w-full py-4 rounded-xl font-medium text-center text-white ${uploading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}>
                 {uploading ? 'アップロード中...' : '納品する（ファイルアップロード）'}
               </div>
             </label>
+          )}
+
+          {/* ★ 工程1：検収ボタン（Claude指示通り） */}
+          {canComplete && (
+            <button
+              onClick={handleComplete}
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-xl font-medium text-lg mb-4"
+            >
+              検収OK（取引完了）
+            </button>
           )}
 
           <div className="text-sm text-gray-500 mt-8 pt-4 border-t">
