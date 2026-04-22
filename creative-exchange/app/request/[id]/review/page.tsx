@@ -50,42 +50,44 @@ export default function ReviewPage() {
     setSubmitting(true)
     const supabase = createClient()
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      alert('ログインしてください')
-      return
-    }
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('ログインしてください')
 
-    // Auth ID → users.id 変換
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id')
-      .eq('auth_id', user.id)
-      .single()
+      // Auth ID → users.id 変換（必須パターン）
+      const { data: profile } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_id', user.id)
+        .single()
 
-    if (!profile) {
-      alert('ユーザー情報が見つかりません')
-      return
-    }
+      if (!profile) throw new Error('ユーザー情報が見つかりません')
 
-    const { error } = await supabase
-      .from('reviews')
-      .insert({
-        order_id: id,
-        reviewer_id: profile.id,
-        reviewee_id: request.client_id === profile.id ? request.creator_id : request.client_id,
-        rating,
-        comment: comment.trim()
-      })
+      // 評価対象者（相手）を特定
+      const revieweeId = request.client_id === profile.id 
+        ? request.creator_id 
+        : request.client_id
 
-    if (error) {
-      alert('評価の保存に失敗しました: ' + error.message)
-    } else {
+      const { error } = await supabase
+        .from('reviews')
+        .insert({
+          order_id: id,
+          reviewer_id: profile.id,
+          reviewee_id: revieweeId,
+          rating,
+          comment: comment.trim()
+        })
+
+      if (error) throw error
+
       alert('評価を送信しました！ありがとうございます！')
-      router.push(`/request/${id}`)
-    }
+      router.push(`/request/${id}`)   // 依頼詳細ページに戻る
 
-    setSubmitting(false)
+    } catch (err: any) {
+      alert('評価の保存に失敗しました: ' + (err.message || '不明なエラー'))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (loading) return <div className="p-12 text-center">読み込み中...</div>
@@ -130,7 +132,7 @@ export default function ReviewPage() {
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder="取引の感想や相手への感謝を教えてください"
-              className="w-full h-32 p-4 border border-gray-300 rounded-xl focus:outline-none focus:border-blue-500"
+              className="w-full h-32 p-4 border border-gray-300 rounded-xl focus:outline-none focus:border-amber-500 resize-y"
             />
           </div>
 
