@@ -69,9 +69,9 @@ export default function ReviewPage() {
         : request.client_id
 
       // 自分自身を評価しようとしていないかチェック
-      if (profile.id === revieweeId) {
-        throw new Error('自分自身を評価することはできません')
-      }
+     //  if (profile.id === revieweeId) {
+       //  throw new Error('自分自身を評価することはできません')
+     //  }
 
       const { error } = await supabase
         .from('reviews')
