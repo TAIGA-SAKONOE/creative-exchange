@@ -43,7 +43,6 @@ export default function RequestDetail() {
     loadData()
   }, [id])
 
-  // 納品処理（前回修正版を維持）
   const handleDeliver = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !currentUser || !request) return
@@ -79,10 +78,7 @@ export default function RequestDetail() {
     }
   }
 
-  // ★ 工程1：検収処理（Claude指示通り追加）
   const handleComplete = async () => {
-    if (!currentUser || !request) return
-
     const supabase = createClient()
 
     const { error } = await supabase
@@ -111,7 +107,7 @@ export default function RequestDetail() {
 
   const canAccept = request.status === 'draft' && !isClient
   const canDeliver = isCreator && request.status === 'matched'
-  const canComplete = isClient && request.status === 'delivered'   // ← 工程1追加
+  const canComplete = isClient   // ← テスト用に依頼者なら常に表示
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -138,7 +134,6 @@ export default function RequestDetail() {
             </span>
           </div>
 
-          {/* 依頼情報表示（省略せず） */}
           <div className="mb-8">
             <p className="text-sm text-gray-500">品目</p>
             <p className="text-lg font-medium">{request.categories?.name || '未分類'}</p>
@@ -158,7 +153,6 @@ export default function RequestDetail() {
             </div>
           )}
 
-          {/* アクションボタンエリア */}
           {canAccept && (
             <button onClick={() => alert('受注は既に動作確認済みです')} 
               className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-medium mb-4">
@@ -181,21 +175,8 @@ export default function RequestDetail() {
             </label>
           )}
 
-          {/* ★ 工程1：検収ボタン（Claude指示通り） */}
+          {/* 検収ボタン（テスト用に依頼者なら常に表示） */}
           {canComplete && (
             <button
               onClick={handleComplete}
-              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-xl font-medium text-lg mb-4"
-            >
-              検収OK（取引完了）
-            </button>
-          )}
-
-          <div className="text-sm text-gray-500 mt-8 pt-4 border-t">
-            作成日: {new Date(request.created_at).toLocaleDateString('ja-JP')}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
+              className="w-full bg-purple-600 hover:bg-purple-700
