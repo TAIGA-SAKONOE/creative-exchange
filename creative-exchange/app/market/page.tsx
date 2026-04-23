@@ -89,7 +89,7 @@ export default function MarketPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {marketData.map((item) => {
             const stats = item.stats
-            const hasData = stats.transaction_count > 0
+            const hasData = stats.transaction_count >= 5
 
             return (
               <div
@@ -137,7 +137,7 @@ export default function MarketPage() {
                   <div className="py-8 text-center text-gray-500">
                     データ不足です
                     <br />
-                    取引が蓄積されると表示されます
+                    5件以上の取引が蓄積されると表示されます
                   </div>
                 )}
 
