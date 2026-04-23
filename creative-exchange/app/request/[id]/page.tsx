@@ -247,6 +247,51 @@ export default function RequestDetail() {
     }
   }
 
+  const getDeadlineMeta = (deadline: string) => {
+    const today = new Date()
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+
+    const deadlineDate = new Date(deadline)
+    const deadlineStart = new Date(
+      deadlineDate.getFullYear(),
+      deadlineDate.getMonth(),
+      deadlineDate.getDate()
+    )
+
+    const diffMs = deadlineStart.getTime() - todayStart.getTime()
+    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
+
+    const formattedDate = `${deadlineStart.getFullYear()}年${deadlineStart.getMonth() + 1}月${deadlineStart.getDate()}日`
+
+    if (diffDays > 0) {
+      return {
+        formattedDate,
+        relativeLabel: `あと${diffDays}日`,
+        containerClass: 'bg-orange-50 border border-orange-100',
+        dateClass: 'text-orange-600',
+        labelClass: 'text-orange-700',
+      }
+    }
+
+    if (diffDays === 0) {
+      return {
+        formattedDate,
+        relativeLabel: '本日が納期です',
+        containerClass: 'bg-yellow-50 border border-yellow-100',
+        dateClass: 'text-yellow-700',
+        labelClass: 'text-yellow-700',
+      }
+    }
+
+    return {
+      formattedDate,
+      relativeLabel: `${Math.abs(diffDays)}日超過`,
+      containerClass: 'bg-red-50 border border-red-100',
+      dateClass: 'text-red-600',
+      labelClass: 'text-red-700',
+    }
+  }
+
   if (loading) {
     return <LoadingState message="依頼詳細を読み込み中..." />
   }
@@ -339,6 +384,22 @@ export default function RequestDetail() {
               </div>
             )}
 
+            {request.deadline && (() => {
+              const deadlineMeta = getDeadlineMeta(request.deadline)
+
+              return (
+                <div className={`mb-10 p-6 rounded-2xl ${deadlineMeta.containerClass}`}>
+                  <p className={`text-sm mb-1 ${deadlineMeta.labelClass}`}>希望納期</p>
+                  <p className={`text-2xl font-bold ${deadlineMeta.dateClass}`}>
+                    {deadlineMeta.formattedDate}
+                  </p>
+                  <p className={`mt-2 text-sm font-medium ${deadlineMeta.labelClass}`}>
+                    {deadlineMeta.relativeLabel}
+                  </p>
+                </div>
+              )
+            })()}
+
             <div className="mb-10">
               <p className="text-sm text-gray-500 mb-4">納品ファイル</p>
 
@@ -376,13 +437,13 @@ export default function RequestDetail() {
             {canMessage && (
               <div className="mb-10">
                 <div className="mb-4">
-  <p className="text-sm text-gray-500">メッセージ</p>
-  <p className="text-xs text-gray-400 mt-1">
-    {request.status === 'open'
-      ? '公開中の依頼では、ログイン済みユーザーが事前相談できます。'
-      : '受発注後のやり取りは当事者のみ表示されます。'}
-  </p>
-</div>
+                  <p className="text-sm text-gray-500">メッセージ</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {request.status === 'open'
+                      ? '公開中の依頼では、ログイン済みユーザーが事前相談できます。'
+                      : '受発注後のやり取りは当事者のみ表示されます。'}
+                  </p>
+                </div>
 
                 <div className="space-y-3 mb-4">
                   {messages.length > 0 ? (
