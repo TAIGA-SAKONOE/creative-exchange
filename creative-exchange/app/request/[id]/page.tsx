@@ -12,11 +12,14 @@ export default function RequestDetail() {
 
   const [request, setRequest] = useState<any>(null)
   const [deliverables, setDeliverables] = useState<any[]>([])
+  const [messages, setMessages] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [profile, setProfile] = useState<any>(null)
   const [uploading, setUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [messageText, setMessageText] = useState('')
+  const [sendingMessage, setSendingMessage] = useState(false)
 
   const router = useRouter()
 
@@ -82,6 +85,39 @@ export default function RequestDetail() {
         console.error('deliverables取得エラー', filesError)
       } else {
         setDeliverables(files ?? [])
+      }
+
+      const { data: messageRows, error: messagesError } = await supabase
+        .from('order_messages')
+        .select('*')
+        .eq('order_id', id)
+        .order('created_at', { ascending: true })
+
+      if (messagesError) {
+        console.error('order_messages取得エラー', messagesError)
+      } else {
+        const senderIds = [...new Set((messageRows ?? []).map((msg: any) => msg.sender_user_id))]
+        let senderMap: Record<string, string> = {}
+
+        if (senderIds.length > 0) {
+          const { data: senderProfiles } = await supabase
+            .from('users')
+            .select('id, display_name')
+            .in('id', senderIds)
+
+          senderMap =
+            (senderProfiles ?? []).reduce((acc: Record<string, string>, item: any) => {
+              acc[item.id] = item.display_name || '不明なユーザー'
+              return acc
+            }, {}) || {}
+        }
+
+        const enrichedMessages = (messageRows ?? []).map((msg: any) => ({
+          ...msg,
+          sender_name: senderMap[msg.sender_user_id] || '不明なユーザー',
+        }))
+
+        setMessages(enrichedMessages)
       }
     } catch (err: any) {
       setError(err.message || 'データの読み込み中にエラーが発生しました')
@@ -184,28 +220,55 @@ export default function RequestDetail() {
     loadData()
   }
 
+  const handleSendMessage = async () => {
+    if (!profile?.id) return
+    if (!messageText.trim()) return
+
+    setSendingMessage(true)
+    const supabase = createClient()
+
+    try {
+      const { error: insertError } = await supabase
+        .from('order_messages')
+        .insert({
+          order_id: id,
+          sender_user_id: profile.id,
+          message: messageText.trim(),
+        })
+
+      if (insertError) throw insertError
+
+      setMessageText('')
+      loadData()
+    } catch (err: any) {
+      alert('メッセージ送信に失敗しました: ' + err.message)
+    } finally {
+      setSendingMessage(false)
+    }
+  }
+
   if (loading) {
-  return <LoadingState message="依頼詳細を読み込み中..." />
-}
+    return <LoadingState message="依頼詳細を読み込み中..." />
+  }
 
-if (error) {
-  return (
-    <MessageState
-      title="依頼詳細を表示できません"
-      message={error}
-      tone="error"
-    />
-  )
-}
+  if (error) {
+    return (
+      <MessageState
+        title="依頼詳細を表示できません"
+        message={error}
+        tone="error"
+      />
+    )
+  }
 
-if (!request) {
-  return (
-    <MessageState
-      title="依頼が見つかりません"
-      message="指定された依頼は存在しないか、現在は閲覧できません。"
-    />
-  )
-}
+  if (!request) {
+    return (
+      <MessageState
+        title="依頼が見つかりません"
+        message="指定された依頼は存在しないか、現在は閲覧できません。"
+      />
+    )
+  }
 
   const isClient = profile?.id && String(request.client_id) === String(profile.id)
   const isCreator = profile?.id && String(request.creator_id) === String(profile.id)
@@ -215,6 +278,7 @@ if (!request) {
     isCreator && ['matched', 'in_progress', 'revision'].includes(request.status)
   const canComplete = isClient && request.status === 'delivered'
   const canReview = (isClient || isCreator) && request.status === 'completed'
+  const canMessage = isClient || isCreator
 
   const statusLabel =
     request.status === 'draft'
@@ -308,6 +372,66 @@ if (!request) {
                 </div>
               )}
             </div>
+
+            {canMessage && (
+              <div className="mb-10">
+                <p className="text-sm text-gray-500 mb-4">メッセージ</p>
+
+                <div className="space-y-3 mb-4">
+                  {messages.length > 0 ? (
+                    messages.map((msg: any) => {
+                      const isMine = String(msg.sender_user_id) === String(profile?.id)
+
+                      return (
+                        <div
+                          key={msg.id}
+                          className={`p-4 rounded-2xl ${
+                            isMine
+                              ? 'bg-blue-50 border border-blue-100 ml-8'
+                              : 'bg-gray-50 border border-gray-100 mr-8'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-4 mb-2">
+                            <p className="text-sm font-medium text-gray-700">
+                              {msg.sender_name}
+                            </p>
+                            <p className="text-xs text-gray-500 whitespace-nowrap">
+                              {msg.created_at
+                                ? new Date(msg.created_at).toLocaleString('ja-JP')
+                                : ''}
+                            </p>
+                          </div>
+                          <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                            {msg.message}
+                          </p>
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <div className="p-5 bg-gray-50 rounded-2xl text-gray-500 text-sm">
+                      まだメッセージはありません
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <textarea
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    rows={4}
+                    className="w-full px-4 py-3 border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-200 resize-y"
+                    placeholder="依頼に関するメッセージを入力してください"
+                  />
+                  <button
+                    onClick={handleSendMessage}
+                    disabled={!messageText.trim() || sendingMessage}
+                    className="w-full bg-gray-900 hover:bg-black disabled:bg-gray-400 text-white py-4 rounded-2xl font-medium shadow-sm"
+                  >
+                    {sendingMessage ? '送信中...' : 'メッセージを送る'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-4 pt-6 border-t">
               {canAccept && (
