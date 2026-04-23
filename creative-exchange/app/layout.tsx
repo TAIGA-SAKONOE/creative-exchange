@@ -31,6 +31,19 @@ export default function RootLayout({
       <body className="min-h-full bg-gray-50 text-gray-900">
         <AppHeader />
         <main>{children}</main>
+        <footer className="border-t border-gray-200 bg-white mt-16">
+  <div className="max-w-6xl mx-auto px-4 py-6 flex flex-col md:flex-row items-center justify-between gap-3 text-sm text-gray-500">
+    <div>© 2026 Creative Exchange</div>
+    <div className="flex items-center gap-4">
+      <Link href="/terms" className="hover:text-gray-700 transition">
+        利用規約
+      </Link>
+      <Link href="/privacy" className="hover:text-gray-700 transition">
+        プライバシーポリシー
+      </Link>
+    </div>
+  </div>
+</footer>
       </body>
     </html>
   )
