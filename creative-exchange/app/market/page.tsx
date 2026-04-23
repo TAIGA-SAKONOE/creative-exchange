@@ -3,6 +3,8 @@
 import { createClient } from '../../lib/supabase/client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import LoadingState from '../components/LoadingState'
+import MessageState from '../components/MessageState'
 
 type MarketStatRow = {
   median_price: number | null
@@ -16,64 +18,79 @@ type MarketStatRow = {
 export default function MarketPage() {
   const [marketData, setMarketData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchMarketData = async () => {
-      const supabase = createClient()
+      try {
+        setLoading(true)
+        setError(null)
 
-      const { data: categories, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name')
+        const supabase = createClient()
 
-      if (error) {
-        console.error('カテゴリ取得エラー:', error)
-        setLoading(false)
-        return
-      }
+        const { data: categories, error } = await supabase
+          .from('categories')
+          .select('*')
+          .order('name')
 
-      const results = []
+        if (error) throw error
 
-      for (const category of categories || []) {
-        const { data, error: statsError } = await supabase.rpc(
-          'calculate_market_stats',
-          {
-            p_category_id: category.id,
-            p_days: 90,
+        const results = []
+
+        for (const category of categories || []) {
+          const { data, error: statsError } = await supabase.rpc(
+            'calculate_market_stats',
+            {
+              p_category_id: category.id,
+              p_days: 90,
+            }
+          )
+
+          if (statsError) {
+            console.error('market stats error', category.name, statsError)
           }
-        )
 
-        if (statsError) {
-          console.error('market stats error', category.name, statsError)
+          const stats: MarketStatRow =
+            Array.isArray(data) && data.length > 0
+              ? data[0]
+              : {
+                  median_price: null,
+                  avg_price: null,
+                  p25_price: null,
+                  p75_price: null,
+                  transaction_count: 0,
+                  confidence_label: '参考値',
+                }
+
+          results.push({
+            ...category,
+            stats,
+          })
         }
 
-        const stats: MarketStatRow =
-          Array.isArray(data) && data.length > 0
-            ? data[0]
-            : {
-                median_price: null,
-                avg_price: null,
-                p25_price: null,
-                p75_price: null,
-                transaction_count: 0,
-                confidence_label: '参考値',
-              }
-
-        results.push({
-          ...category,
-          stats,
-        })
+        setMarketData(results)
+      } catch (err: any) {
+        setError(err.message || '相場データの読み込みに失敗しました')
+      } finally {
+        setLoading(false)
       }
-
-      setMarketData(results)
-      setLoading(false)
     }
 
     fetchMarketData()
   }, [])
 
   if (loading) {
-    return <div className="p-12 text-center">相場データを読み込み中...</div>
+    return <LoadingState message="相場データを読み込み中..." />
+  }
+
+  if (error) {
+    return (
+      <MessageState
+        title="相場ボードを表示できません"
+        message={error}
+        tone="error"
+      />
+    )
   }
 
   return (
