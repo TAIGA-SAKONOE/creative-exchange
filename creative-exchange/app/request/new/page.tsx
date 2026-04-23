@@ -2,7 +2,7 @@
 
 import { createClient } from '../../../lib/supabase/client'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 export default function NewRequest() {
   const [categories, setCategories] = useState<any[]>([])
@@ -13,11 +13,29 @@ export default function NewRequest() {
   const [marketStats, setMarketStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   useEffect(() => {
-    const loadCategories = async () => {
+    const initialCategory = searchParams.get('category')
+    if (initialCategory) {
+      setSelectedCategory(initialCategory)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    const initializePage = async () => {
       const supabase = createClient()
+
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser()
+
+      if (!authUser) {
+        router.replace('/login')
+        return
+      }
 
       const { data, error } = await supabase
         .from('categories')
@@ -33,10 +51,9 @@ export default function NewRequest() {
       setLoading(false)
     }
 
-    loadCategories()
-  }, [])
+    initializePage()
+  }, [router])
 
-  // 品目選択時に相場を取得
   useEffect(() => {
     const fetchMarketStats = async () => {
       if (!selectedCategory) {
@@ -46,12 +63,30 @@ export default function NewRequest() {
 
       const supabase = createClient()
 
-      const { data } = await supabase.rpc('calculate_market_stats', {
-        p_category_id: parseInt(selectedCategory),
-        p_days: 90
+      const { data, error } = await supabase.rpc('calculate_market_stats', {
+        p_category_id: parseInt(selectedCategory, 10),
+        p_days: 90,
       })
 
-      setMarketStats(data || { count: 0, median: 0, p25: 0, p75: 0 })
+      if (error) {
+        console.error('相場取得エラー:', error)
+        setMarketStats(null)
+        return
+      }
+
+      const stats =
+        Array.isArray(data) && data.length > 0
+          ? data[0]
+          : {
+              median_price: null,
+              avg_price: null,
+              p25_price: null,
+              p75_price: null,
+              transaction_count: 0,
+              confidence_label: '参考値',
+            }
+
+      setMarketStats(stats)
     }
 
     fetchMarketStats()
@@ -59,6 +94,7 @@ export default function NewRequest() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
     if (!selectedCategory || !title.trim() || !description.trim()) {
       alert('必須項目を入力してください')
       return
@@ -68,7 +104,10 @@ export default function NewRequest() {
     const supabase = createClient()
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
       if (!user) throw new Error('ログインしてください')
 
       const { data: profile } = await supabase
@@ -81,12 +120,12 @@ export default function NewRequest() {
 
       const { error } = await supabase.from('orders').insert({
         client_id: profile.id,
-        category_id: parseInt(selectedCategory),
+        category_id: parseInt(selectedCategory, 10),
         title: title.trim(),
         description: description.trim(),
-        agreed_price: budget ? parseInt(budget) : null,
+        agreed_price: budget ? parseInt(budget, 10) : null,
         specification: { note: '基本依頼' },
-        status: 'open'
+        status: 'open',
       })
 
       if (error) throw error
@@ -105,7 +144,7 @@ export default function NewRequest() {
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-2xl mx-auto px-4">
-        <button 
+        <button
           onClick={() => router.push('/mypage')}
           className="mb-6 text-gray-500 hover:text-gray-700 flex items-center gap-2"
         >
@@ -117,7 +156,9 @@ export default function NewRequest() {
 
           <form onSubmit={handleSubmit} className="space-y-8">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">品目</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                品目
+              </label>
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
@@ -133,33 +174,48 @@ export default function NewRequest() {
               </select>
             </div>
 
-            {/* 相場表示エリア */}
             {selectedCategory && marketStats && (
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-                <p className="text-sm text-blue-600 font-medium mb-3">この品目の相場（直近90日間）</p>
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <p className="text-xs text-gray-500">取引件数</p>
-                    <p className="text-lg font-semibold">{marketStats.count}件</p>
+                <p className="text-sm text-blue-600 font-medium mb-3">
+                  この品目の相場（直近90日間）
+                </p>
+
+                {marketStats.transaction_count >= 5 ? (
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p className="text-xs text-gray-500">取引件数</p>
+                      <p className="text-lg font-semibold">
+                        {marketStats.transaction_count}件
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">中央値</p>
+                      <p className="text-xl font-bold text-blue-600">
+                        ¥{Math.round(marketStats.median_price ?? 0).toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">価格帯</p>
+                      <p className="text-sm">
+                        ¥{Math.round(marketStats.p25_price ?? 0).toLocaleString()} 〜
+                        ¥{Math.round(marketStats.p75_price ?? 0).toLocaleString()}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500">中央値</p>
-                    <p className="text-xl font-bold text-blue-600">
-                      ¥{Math.round(marketStats.median).toLocaleString()}
-                    </p>
+                ) : (
+                  <div className="text-center text-gray-500 py-4">
+                    データ不足です
+                    <br />
+                    5件以上の取引が蓄積されると表示されます
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500">価格帯</p>
-                    <p className="text-sm">
-                      ¥{Math.round(marketStats.p25).toLocaleString()} 〜 ¥{Math.round(marketStats.p75).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
+                )}
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">依頼タイトル</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                依頼タイトル
+              </label>
               <input
                 type="text"
                 value={title}
@@ -171,7 +227,9 @@ export default function NewRequest() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">依頼内容</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                依頼内容
+              </label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -182,7 +240,9 @@ export default function NewRequest() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">希望予算（任意）</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                希望予算（任意）
+              </label>
               <input
                 type="number"
                 value={budget}
