@@ -68,6 +68,8 @@ export default function ExchangePage() {
   const [categoryKeyword, setCategoryKeyword] = useState('')
   const [titleKeyword, setTitleKeyword] = useState('')
   const [descriptionKeyword, setDescriptionKeyword] = useState('')
+  const [minBudget, setMinBudget] = useState('')
+  const [maxBudget, setMaxBudget] = useState('')
 
   const [creatorCategoryId, setCreatorCategoryId] = useState('')
   const [creatorNameKeyword, setCreatorNameKeyword] = useState('')
@@ -277,10 +279,14 @@ export default function ExchangePage() {
   }
 
   const filteredOrders = useMemo(() => {
+    const parsedMinBudget = minBudget.trim() === '' ? null : Number(minBudget)
+    const parsedMaxBudget = maxBudget.trim() === '' ? null : Number(maxBudget)
+
     return orders.filter((order) => {
       const categoryName = getCategoryName(order)
       const title = order.title || ''
       const description = order.description || ''
+      const price = order.agreed_price
 
       const matchCategory =
         categoryKeyword.trim() === '' ||
@@ -294,9 +300,29 @@ export default function ExchangePage() {
         descriptionKeyword.trim() === '' ||
         description.toLowerCase().includes(descriptionKeyword.toLowerCase())
 
-      return matchCategory && matchTitle && matchDescription
+      const matchMinBudget =
+        parsedMinBudget === null ||
+        (typeof parsedMinBudget === 'number' &&
+          !Number.isNaN(parsedMinBudget) &&
+          price !== null &&
+          Number(price) >= parsedMinBudget)
+
+      const matchMaxBudget =
+        parsedMaxBudget === null ||
+        (typeof parsedMaxBudget === 'number' &&
+          !Number.isNaN(parsedMaxBudget) &&
+          price !== null &&
+          Number(price) <= parsedMaxBudget)
+
+      return (
+        matchCategory &&
+        matchTitle &&
+        matchDescription &&
+        matchMinBudget &&
+        matchMaxBudget
+      )
     })
-  }, [orders, categoryKeyword, titleKeyword, descriptionKeyword])
+  }, [orders, categoryKeyword, titleKeyword, descriptionKeyword, minBudget, maxBudget])
 
   const filteredCreators = useMemo(() => {
     return creators.filter((creator) => {
@@ -464,7 +490,7 @@ export default function ExchangePage() {
                 <div>
                   <h2 className="text-2xl font-bold">依頼を検索</h2>
                   <p className="text-sm text-gray-500 mt-2">
-                    カテゴリ・タイトル・説明文から公開依頼を絞り込めます
+                    カテゴリ・タイトル・説明文・予算から公開依頼を絞り込めます
                   </p>
                 </div>
                 <div className="text-sm text-gray-500">
@@ -472,7 +498,7 @@ export default function ExchangePage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-2">
                     カテゴリ
@@ -508,6 +534,34 @@ export default function ExchangePage() {
                     value={descriptionKeyword}
                     onChange={(e) => setDescriptionKeyword(e.target.value)}
                     placeholder="説明文で検索"
+                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                    最低金額
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={minBudget}
+                    onChange={(e) => setMinBudget(e.target.value)}
+                    placeholder="例: 10000"
+                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                    最高金額
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={maxBudget}
+                    onChange={(e) => setMaxBudget(e.target.value)}
+                    placeholder="例: 50000"
                     className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
                   />
                 </div>
