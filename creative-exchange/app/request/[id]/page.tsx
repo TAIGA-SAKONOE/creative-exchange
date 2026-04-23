@@ -278,7 +278,7 @@ export default function RequestDetail() {
     isCreator && ['matched', 'in_progress', 'revision'].includes(request.status)
   const canComplete = isClient && request.status === 'delivered'
   const canReview = (isClient || isCreator) && request.status === 'completed'
-  const canMessage = isClient || isCreator
+  const canMessage = request.status === 'open' || isClient || isCreator
 
   const statusLabel =
     request.status === 'draft'
@@ -375,7 +375,14 @@ export default function RequestDetail() {
 
             {canMessage && (
               <div className="mb-10">
-                <p className="text-sm text-gray-500 mb-4">メッセージ</p>
+                <div className="mb-4">
+  <p className="text-sm text-gray-500">メッセージ</p>
+  <p className="text-xs text-gray-400 mt-1">
+    {request.status === 'open'
+      ? '公開中の依頼では、ログイン済みユーザーが事前相談できます。'
+      : '受発注後のやり取りは当事者のみ表示されます。'}
+  </p>
+</div>
 
                 <div className="space-y-3 mb-4">
                   {messages.length > 0 ? (
