@@ -1,5 +1,7 @@
 'use client'
 
+import LoadingState from '../../components/LoadingState'
+import MessageState from '../../components/MessageState'
 import { createClient } from '../../../lib/supabase/client'
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
