@@ -8,6 +8,7 @@ export default function MyPage() {
   const [user, setUser] = useState<any>(null)
   const [requests, setRequests] = useState<any[]>([])
   const [receivedOrders, setReceivedOrders] = useState<any[]>([])
+  const [notifications, setNotifications] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [userCategoryNames, setUserCategoryNames] = useState<string[]>([])
 
@@ -74,6 +75,15 @@ export default function MyPage() {
             .filter(Boolean) || []
 
         setUserCategoryNames(names)
+
+        const { data: notificationRows } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', profile.id)
+          .order('created_at', { ascending: false })
+          .limit(20)
+
+        setNotifications(notificationRows || [])
       }
 
       setLoading(false)
@@ -197,6 +207,48 @@ export default function MyPage() {
               プロフィール編集
             </Link>
           </div>
+        </div>
+
+        <div className="bg-white rounded-3xl shadow-xl p-10 mb-12">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-2xl font-bold">通知ボード</h2>
+            <span className="text-sm text-gray-500">{notifications.length}件</span>
+          </div>
+
+          {notifications.length === 0 ? (
+            <div className="text-center py-16 text-gray-500">
+              まだ通知はありません
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {notifications.map((notification) => (
+                <Link
+                  key={notification.id}
+                  href={notification.link_url || '/mypage'}
+                  className="group border border-gray-200 hover:border-blue-300 hover:shadow-md rounded-2xl p-5 transition-all duration-300"
+                >
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-lg font-semibold mb-1 group-hover:text-blue-600 transition-colors">
+                        {notification.title}
+                      </div>
+                      {notification.body && (
+                        <div className="text-gray-600 whitespace-pre-wrap leading-relaxed">
+                          {notification.body}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="text-right shrink-0 text-xs text-gray-500">
+                      {notification.created_at
+                        ? new Date(notification.created_at).toLocaleString('ja-JP')
+                        : ''}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-3xl shadow-xl p-10 mb-12">
