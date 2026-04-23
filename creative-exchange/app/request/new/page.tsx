@@ -19,6 +19,7 @@ export default function NewRequest() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [budget, setBudget] = useState('')
+  const [deadline, setDeadline] = useState('')
   const [marketStats, setMarketStats] = useState<MarketStatRow | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -125,6 +126,7 @@ export default function NewRequest() {
         title: title.trim(),
         description: description.trim(),
         agreed_price: budget ? parseInt(budget, 10) : null,
+        deadline: deadline || null,
         specification: { note: '基本依頼' },
         status: 'open',
       })
@@ -238,6 +240,21 @@ export default function NewRequest() {
                 className="w-full h-40 p-4 border border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 resize-y"
                 required
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                希望納期
+              </label>
+              <input
+                type="date"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+                className="w-full p-4 border border-gray-300 rounded-xl focus:outline-none focus:border-blue-500"
+              />
+              <p className="mt-2 text-sm text-gray-500">
+                取引後に双方が確認できる納期です。未入力でも作成できます。
+              </p>
             </div>
 
             <div>
