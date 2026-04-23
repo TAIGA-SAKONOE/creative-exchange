@@ -86,7 +86,7 @@ export default function NewRequest() {
         description: description.trim(),
         agreed_price: budget ? parseInt(budget) : null,
         specification: { note: '基本依頼' },
-        status: 'draft'
+        status: 'open'
       })
 
       if (error) throw error
