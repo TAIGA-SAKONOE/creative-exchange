@@ -8,6 +8,8 @@ export default function ProfileEdit() {
   const [user, setUser] = useState<any>(null)
   const [displayName, setDisplayName] = useState('')
   const [bio, setBio] = useState('')
+  const [skillsText, setSkillsText] = useState('')
+  const [portfolioText, setPortfolioText] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
@@ -36,6 +38,18 @@ export default function ProfileEdit() {
       if (profile) {
         setDisplayName(profile.display_name || user.user_metadata?.name || '')
         setBio(profile.bio || '')
+
+        if (Array.isArray(profile.skills)) {
+          setSkillsText(profile.skills.join('\n'))
+        } else if (profile.skills) {
+          setSkillsText(String(profile.skills))
+        }
+
+        if (Array.isArray(profile.portfolio_urls)) {
+          setPortfolioText(profile.portfolio_urls.join('\n'))
+        } else if (profile.portfolio_urls) {
+          setPortfolioText(String(profile.portfolio_urls))
+        }
       } else {
         setDisplayName(user.user_metadata?.name || '')
       }
@@ -46,12 +60,22 @@ export default function ProfileEdit() {
     loadProfile()
   }, [router])
 
+  const normalizeLines = (value: string) => {
+    return value
+      .split('\n')
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
 
     setSaving(true)
     const supabase = createClient()
+
+    const skills = normalizeLines(skillsText)
+    const portfolioUrls = normalizeLines(portfolioText)
 
     const { error } = await supabase
       .from('users')
@@ -60,6 +84,8 @@ export default function ProfileEdit() {
           auth_id: user.id,
           display_name: displayName,
           bio: bio,
+          skills: skills.length > 0 ? skills : [],
+          portfolio_urls: portfolioUrls.length > 0 ? portfolioUrls : [],
           twitter_handle: user.user_metadata?.preferred_username || null,
           updated_at: new Date().toISOString(),
         },
@@ -107,6 +133,34 @@ export default function ProfileEdit() {
               className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-black resize-y"
               placeholder="簡単な自己紹介を入力してください"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">スキル</label>
+            <textarea
+              value={skillsText}
+              onChange={(e) => setSkillsText(e.target.value)}
+              rows={5}
+              className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-black resize-y"
+              placeholder={`1行に1つずつ入力してください\n例:\nMVイラスト\n書道\nロゴ制作`}
+            />
+            <p className="mt-2 text-sm text-gray-500">
+              Exchange のクリエイター検索で使われます。1行に1つずつ入力してください。
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">ポートフォリオURL</label>
+            <textarea
+              value={portfolioText}
+              onChange={(e) => setPortfolioText(e.target.value)}
+              rows={4}
+              className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-black resize-y"
+              placeholder={`1行に1つずつURLを入力してください\n例:\nhttps://example.com/portfolio\nhttps://note.com/...`}
+            />
+            <p className="mt-2 text-sm text-gray-500">
+              Exchange のクリエイター一覧で使われます。1行に1つずつ入力してください。
+            </p>
           </div>
 
           <button
