@@ -52,47 +52,47 @@ export default function MyPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-4xl mx-auto px-4">
-        <div className="flex justify-between items-center mb-10">
-          <h1 className="text-4xl font-bold">マイページ</h1>
+        <div className="flex justify-between items-center mb-12">
+          <h1 className="text-4xl font-bold tracking-tight">マイページ</h1>
           <Link 
             href="/request/new"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-2xl font-medium shadow-sm"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3.5 rounded-2xl font-medium shadow-sm transition"
           >
             新しい依頼を作成
           </Link>
         </div>
 
-        {/* プロフィールカード */}
-        <div className="bg-white rounded-3xl shadow-lg p-8 mb-10">
-          <div className="flex items-center gap-6">
-            <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center text-5xl text-white shadow-inner">
+        {/* プロフィール */}
+        <div className="bg-white rounded-3xl shadow-xl p-10 mb-12">
+          <div className="flex items-center gap-8">
+            <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-blue-500 rounded-3xl flex items-center justify-center text-6xl text-white shadow-inner">
               👤
             </div>
-            <div>
-              <h2 className="text-3xl font-bold">{user.display_name}</h2>
-              <p className="text-xl text-gray-600">@{user.twitter_handle || '未設定'}</p>
-              {user.bio && <p className="mt-4 text-gray-700 leading-relaxed">{user.bio}</p>}
+            <div className="flex-1">
+              <h2 className="text-4xl font-bold mb-1">{user.display_name}</h2>
+              <p className="text-2xl text-gray-600">@{user.twitter_handle || '未設定'}</p>
+              {user.bio && <p className="mt-6 text-lg text-gray-700 leading-relaxed">{user.bio}</p>}
             </div>
           </div>
 
           <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-4">
             <Link
               href={`/creator/${user.id}`}
-              className="bg-gradient-to-r from-purple-600 to-blue-600 text-white py-4 rounded-2xl font-medium text-center hover:brightness-105 transition flex items-center justify-center gap-2 shadow-sm"
+              className="bg-gradient-to-r from-purple-600 to-blue-600 text-white py-5 rounded-2xl font-medium text-center hover:brightness-105 transition shadow-sm flex items-center justify-center gap-3"
             >
               📊 自分の価格表を見る
             </Link>
 
             <Link
               href="/market"
-              className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-2xl font-medium text-center hover:brightness-105 transition flex items-center justify-center gap-2 shadow-sm"
+              className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-5 rounded-2xl font-medium text-center hover:brightness-105 transition shadow-sm flex items-center justify-center gap-3"
             >
               📈 相場ボードを見る
             </Link>
 
             <Link
               href="/profile/edit"
-              className="border border-gray-300 hover:bg-gray-50 py-4 rounded-2xl font-medium text-center transition"
+              className="border-2 border-gray-300 hover:bg-gray-50 py-5 rounded-2xl font-medium text-center transition"
             >
               プロフィール編集
             </Link>
@@ -100,8 +100,8 @@ export default function MyPage() {
         </div>
 
         {/* 依頼一覧 */}
-        <div className="bg-white rounded-3xl shadow-lg p-8">
-          <h2 className="text-2xl font-bold mb-6">あなたの依頼一覧</h2>
+        <div className="bg-white rounded-3xl shadow-xl p-10">
+          <h2 className="text-2xl font-bold mb-8">あなたの依頼一覧</h2>
 
           {requests.length === 0 ? (
             <div className="text-center py-20 text-gray-500">
@@ -109,22 +109,22 @@ export default function MyPage() {
               「新しい依頼を作成」から初めてみましょう
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="grid gap-6">
               {requests.map((req) => (
                 <Link 
                   key={req.id}
                   href={`/request/${req.id}`}
-                  className="block border border-gray-200 hover:border-blue-400 hover:shadow-md rounded-2xl p-6 transition-all duration-200"
+                  className="group border border-gray-200 hover:border-blue-300 hover:shadow-lg rounded-3xl p-8 transition-all duration-300"
                 >
                   <div className="flex justify-between items-start">
                     <div>
-                      <div className="font-semibold text-lg">{req.title}</div>
-                      <div className="text-sm text-gray-500 mt-1">
-                        {req.categories?.name || '未分類'}
+                      <div className="text-xl font-semibold mb-2 group-hover:text-blue-600 transition-colors">
+                        {req.title}
                       </div>
+                      <div className="text-gray-600">{req.categories?.name || '未分類'}</div>
                     </div>
                     <div className="text-right">
-                      <div className={`inline-block px-4 py-1 rounded-full text-xs font-medium
+                      <div className={`inline-block px-5 py-1.5 rounded-full text-sm font-medium
                         ${req.status === 'completed' ? 'bg-green-100 text-green-700' : 
                           req.status === 'matched' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
                         {req.status === 'draft' && '下書き'}
@@ -134,7 +134,9 @@ export default function MyPage() {
                         {req.status === 'completed' && '完了'}
                       </div>
                       {req.agreed_price && (
-                        <div className="mt-3 font-semibold text-lg">¥{req.agreed_price.toLocaleString()}</div>
+                        <div className="mt-4 text-2xl font-semibold text-gray-900">
+                          ¥{req.agreed_price.toLocaleString()}
+                        </div>
                       )}
                     </div>
                   </div>
