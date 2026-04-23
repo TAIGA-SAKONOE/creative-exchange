@@ -38,6 +38,19 @@ type CreatorItem = {
   portfolio_urls: string[] | string | null
 }
 
+type CategoryOption = {
+  id: number
+  name: string
+}
+
+type CreatorCategoryMap = Record<
+  string,
+  {
+    ids: number[]
+    names: string[]
+  }
+>
+
 export default function ExchangePage() {
   const router = useRouter()
 
@@ -47,6 +60,8 @@ export default function ExchangePage() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null)
   const [orders, setOrders] = useState<OrderItem[]>([])
   const [creators, setCreators] = useState<CreatorItem[]>([])
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([])
+  const [creatorCategoryMap, setCreatorCategoryMap] = useState<CreatorCategoryMap>({})
   const [activeTab, setActiveTab] = useState<'requests' | 'creators'>('requests')
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null)
 
@@ -54,6 +69,7 @@ export default function ExchangePage() {
   const [titleKeyword, setTitleKeyword] = useState('')
   const [descriptionKeyword, setDescriptionKeyword] = useState('')
 
+  const [creatorCategoryId, setCreatorCategoryId] = useState('')
   const [creatorNameKeyword, setCreatorNameKeyword] = useState('')
   const [creatorBioKeyword, setCreatorBioKeyword] = useState('')
   const [creatorSkillKeyword, setCreatorSkillKeyword] = useState('')
@@ -96,6 +112,19 @@ export default function ExchangePage() {
 
         setCurrentUser(profile as UserProfile)
 
+        const { data: categoryRows, error: categoriesError } = await supabase
+          .from('categories')
+          .select('id, name')
+          .order('name', { ascending: true })
+
+        if (categoriesError) {
+          setError(categoriesError.message || '品目一覧の取得に失敗しました')
+          setLoading(false)
+          return
+        }
+
+        setCategoryOptions((categoryRows || []) as CategoryOption[])
+
         const { data: openOrders, error: ordersError } = await supabase
           .from('orders')
           .select(`
@@ -136,6 +165,49 @@ export default function ExchangePage() {
         )
 
         setCreators(filteredCreatorRows)
+
+        const { data: categoryLinks, error: categoryLinksError } = await supabase
+          .from('user_categories')
+          .select(`
+            user_id,
+            category_id,
+            categories(name)
+          `)
+
+        if (categoryLinksError) {
+          setError(categoryLinksError.message || 'クリエイター品目の取得に失敗しました')
+          setLoading(false)
+          return
+        }
+
+        const nextMap: CreatorCategoryMap = {}
+
+        ;(categoryLinks || []).forEach((row: any) => {
+          const userId = row.user_id
+          const categoryId = row.category_id
+
+          let categoryName: string | null = null
+
+          if (Array.isArray(row.categories)) {
+            categoryName = row.categories[0]?.name || null
+          } else {
+            categoryName = row.categories?.name || null
+          }
+
+          if (!nextMap[userId]) {
+            nextMap[userId] = { ids: [], names: [] }
+          }
+
+          if (!nextMap[userId].ids.includes(categoryId)) {
+            nextMap[userId].ids.push(categoryId)
+          }
+
+          if (categoryName && !nextMap[userId].names.includes(categoryName)) {
+            nextMap[userId].names.push(categoryName)
+          }
+        })
+
+        setCreatorCategoryMap(nextMap)
       } catch (err: any) {
         setError(err?.message || '読み込み中にエラーが発生しました')
       } finally {
@@ -196,6 +268,14 @@ export default function ExchangePage() {
     }
   }
 
+  const getCreatorCategoryNames = (userId: string) => {
+    return creatorCategoryMap[userId]?.names || []
+  }
+
+  const getCreatorCategoryIds = (userId: string) => {
+    return creatorCategoryMap[userId]?.ids || []
+  }
+
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       const categoryName = getCategoryName(order)
@@ -223,6 +303,11 @@ export default function ExchangePage() {
       const displayName = creator.display_name || ''
       const bio = creator.bio || ''
       const skillsText = getSkillText(creator)
+      const creatorCategoryIds = getCreatorCategoryIds(creator.id)
+
+      const matchCategory =
+        creatorCategoryId === '' ||
+        creatorCategoryIds.includes(Number(creatorCategoryId))
 
       const matchName =
         creatorNameKeyword.trim() === '' ||
@@ -236,9 +321,15 @@ export default function ExchangePage() {
         creatorSkillKeyword.trim() === '' ||
         skillsText.toLowerCase().includes(creatorSkillKeyword.toLowerCase())
 
-      return matchName && matchBio && matchSkill
+      return matchCategory && matchName && matchBio && matchSkill
     })
-  }, [creators, creatorNameKeyword, creatorBioKeyword, creatorSkillKeyword])
+  }, [
+    creators,
+    creatorCategoryId,
+    creatorNameKeyword,
+    creatorBioKeyword,
+    creatorSkillKeyword,
+  ])
 
   const handleAccept = async (orderId: string) => {
     if (!currentUser?.id) {
@@ -551,8 +642,26 @@ export default function ExchangePage() {
                       </p>
                     </div>
 
+                    <div className="mb-6">
+                      <p className="text-sm text-gray-500 mb-2">納品できる品目</p>
+                      <div className="flex flex-wrap gap-2">
+                        {getCreatorCategoryNames(currentUser.id).length > 0 ? (
+                          getCreatorCategoryNames(currentUser.id).map((name) => (
+                            <span
+                              key={name}
+                              className="inline-flex px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-sm font-medium border border-blue-100"
+                            >
+                              {name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-gray-500">未設定</span>
+                        )}
+                      </div>
+                    </div>
+
                     <div>
-                      <p className="text-sm text-gray-500 mb-2">スキル</p>
+                      <p className="text-sm text-gray-500 mb-2">補足スキル・得意領域</p>
                       <p className="text-gray-700">{getSkillText(currentUser)}</p>
                     </div>
                   </div>
@@ -605,7 +714,7 @@ export default function ExchangePage() {
                 <div>
                   <h2 className="text-2xl font-bold">クリエイターを検索</h2>
                   <p className="text-sm text-gray-500 mt-2">
-                    表示名・自己紹介・スキルから探せます
+                    納品できる品目・表示名・自己紹介・補足スキルから探せます
                   </p>
                 </div>
                 <div className="text-sm text-gray-500">
@@ -613,7 +722,25 @@ export default function ExchangePage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                    納品できる品目
+                  </label>
+                  <select
+                    value={creatorCategoryId}
+                    onChange={(e) => setCreatorCategoryId(e.target.value)}
+                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+                  >
+                    <option value="">すべて</option>
+                    {categoryOptions.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-2">
                     表示名
@@ -642,13 +769,13 @@ export default function ExchangePage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-2">
-                    スキル
+                    補足スキル
                   </label>
                   <input
                     type="text"
                     value={creatorSkillKeyword}
                     onChange={(e) => setCreatorSkillKeyword(e.target.value)}
-                    placeholder="例: MV / ロゴ / 作詞"
+                    placeholder="例: 和風題字 / レトロ調"
                     className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
                   />
                 </div>
@@ -667,6 +794,7 @@ export default function ExchangePage() {
               <div className="grid gap-6">
                 {filteredCreators.map((creator) => {
                   const portfolioUrl = getFirstPortfolioUrl(creator)
+                  const categoryNames = getCreatorCategoryNames(creator.id)
 
                   return (
                     <div
@@ -697,8 +825,26 @@ export default function ExchangePage() {
                             </p>
                           </div>
 
+                          <div className="mb-6">
+                            <p className="text-sm text-gray-500 mb-2">納品できる品目</p>
+                            <div className="flex flex-wrap gap-2">
+                              {categoryNames.length > 0 ? (
+                                categoryNames.map((name) => (
+                                  <span
+                                    key={name}
+                                    className="inline-flex px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-sm font-medium border border-blue-100"
+                                  >
+                                    {name}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-gray-500">未設定</span>
+                              )}
+                            </div>
+                          </div>
+
                           <div>
-                            <p className="text-sm text-gray-500 mb-2">スキル</p>
+                            <p className="text-sm text-gray-500 mb-2">補足スキル・得意領域</p>
                             <p className="text-gray-700">{getSkillText(creator)}</p>
                           </div>
                         </div>
