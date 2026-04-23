@@ -15,15 +15,18 @@ export default function ProfileEdit() {
   useEffect(() => {
     const loadProfile = async () => {
       const supabase = createClient()
-      
-      const { data: { user } } = await supabase.auth.getUser()
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
       if (!user) {
-        router.push('/login')
+        router.replace('/login')
         return
       }
+
       setUser(user)
 
-      // 既存プロフィールを取得
       const { data: profile } = await supabase
         .from('users')
         .select('*')
@@ -48,20 +51,22 @@ export default function ProfileEdit() {
     if (!user) return
 
     setSaving(true)
-
     const supabase = createClient()
 
     const { error } = await supabase
       .from('users')
-      .upsert({
-        auth_id: user.id,
-        display_name: displayName,
-        bio: bio,
-        twitter_handle: user.user_metadata?.preferred_username || null,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'auth_id'   // ← これを追加（重要）
-      })
+      .upsert(
+        {
+          auth_id: user.id,
+          display_name: displayName,
+          bio: bio,
+          twitter_handle: user.user_metadata?.preferred_username || null,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: 'auth_id',
+        }
+      )
 
     if (error) {
       alert('保存に失敗しました: ' + error.message)
