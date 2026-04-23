@@ -1,5 +1,5 @@
-import Link from 'next/link'
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { Geist, Geist_Mono } from 'next/font/google'
 import AppHeader from './components/AppHeader'
 import './globals.css'
