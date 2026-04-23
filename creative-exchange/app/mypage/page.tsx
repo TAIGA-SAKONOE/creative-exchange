@@ -9,6 +9,7 @@ export default function MyPage() {
   const [requests, setRequests] = useState<any[]>([])
   const [receivedOrders, setReceivedOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [userCategoryNames, setUserCategoryNames] = useState<string[]>([])
 
   useEffect(() => {
     const loadMyPage = async () => {
@@ -53,6 +54,26 @@ export default function MyPage() {
           .order('created_at', { ascending: false })
 
         setReceivedOrders(myReceivedOrders || [])
+
+        const { data: categoryLinks } = await supabase
+          .from('user_categories')
+          .select(`
+            category_id,
+            categories(name)
+          `)
+          .eq('user_id', profile.id)
+
+        const names =
+          (categoryLinks || [])
+            .map((row: any) => {
+              if (Array.isArray(row.categories)) {
+                return row.categories[0]?.name || null
+              }
+              return row.categories?.name || null
+            })
+            .filter(Boolean) || []
+
+        setUserCategoryNames(names)
       }
 
       setLoading(false)
@@ -123,7 +144,25 @@ export default function MyPage() {
               )}
 
               <div className="mt-6">
-                <p className="text-sm font-medium text-gray-500 mb-2">スキル</p>
+                <p className="text-sm font-medium text-gray-500 mb-2">納品できる品目</p>
+                <div className="flex flex-wrap gap-2">
+                  {userCategoryNames.length > 0 ? (
+                    userCategoryNames.map((name) => (
+                      <span
+                        key={name}
+                        className="inline-flex px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-sm font-medium border border-blue-100"
+                      >
+                        {name}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-gray-500">未設定</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <p className="text-sm font-medium text-gray-500 mb-2">補足スキル・得意領域</p>
                 <p className="text-gray-700 leading-relaxed">{getSkillText(user.skills)}</p>
               </div>
             </div>
