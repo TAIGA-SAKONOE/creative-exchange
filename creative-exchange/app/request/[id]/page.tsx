@@ -30,6 +30,30 @@ export default function RequestDetail() {
     loadData()
   }, [id])
 
+  const createNotification = async ({
+    userId,
+    type,
+    title,
+    body,
+    linkUrl,
+  }: {
+    userId: string
+    type: string
+    title: string
+    body?: string
+    linkUrl?: string
+  }) => {
+    const supabase = createClient()
+
+    await supabase.from('notifications').insert({
+      user_id: userId,
+      type,
+      title,
+      body: body || null,
+      link_url: linkUrl || `/request/${id}`,
+    })
+  }
+
   const loadData = async () => {
     try {
       setLoading(true)
@@ -146,6 +170,14 @@ export default function RequestDetail() {
       return
     }
 
+    await createNotification({
+      userId: request.client_id,
+      type: 'order_matched',
+      title: '依頼が受注されました',
+      body: `「${request.title}」が受注されました。`,
+      linkUrl: `/request/${id}`,
+    })
+
     alert('依頼を受注しました！')
     loadData()
   }
@@ -192,6 +224,14 @@ export default function RequestDetail() {
 
       if (updateError) throw updateError
 
+      await createNotification({
+        userId: request.client_id,
+        type: 'order_delivered',
+        title: '納品が完了しました',
+        body: `「${request.title}」に納品ファイルがアップロードされました。`,
+        linkUrl: `/request/${id}`,
+      })
+
       alert('納品が完了しました！')
       setSelectedFile(null)
       loadData()
@@ -218,6 +258,14 @@ export default function RequestDetail() {
       return
     }
 
+    await createNotification({
+      userId: request.creator_id,
+      type: 'order_completed',
+      title: '取引が完了しました',
+      body: `「${request.title}」が検収完了になりました。`,
+      linkUrl: `/request/${id}`,
+    })
+
     alert('取引が完了しました！')
     loadData()
   }
@@ -239,6 +287,28 @@ export default function RequestDetail() {
         })
 
       if (insertError) throw insertError
+
+      let targetUserId: string | null = null
+
+      if (request.status === 'open') {
+        targetUserId = request.client_id === profile.id ? null : request.client_id
+      } else {
+        if (String(request.client_id) === String(profile.id)) {
+          targetUserId = request.creator_id || null
+        } else {
+          targetUserId = request.client_id
+        }
+      }
+
+      if (targetUserId) {
+        await createNotification({
+          userId: targetUserId,
+          type: 'order_message',
+          title: '新しいメッセージがあります',
+          body: `「${request.title}」に新しいメッセージが届きました。`,
+          linkUrl: `/request/${id}`,
+        })
+      }
 
       setMessageText('')
       loadData()
@@ -276,6 +346,21 @@ export default function RequestDetail() {
         .eq('id', id)
 
       if (cancelError) throw cancelError
+
+      const targetUserId =
+        String(request.client_id) === String(profile.id)
+          ? request.creator_id
+          : request.client_id
+
+      if (targetUserId) {
+        await createNotification({
+          userId: targetUserId,
+          type: 'order_cancelled',
+          title: '依頼がキャンセルされました',
+          body: `「${request.title}」がキャンセルされました。\n理由: ${reason.trim()}`,
+          linkUrl: `/request/${id}`,
+        })
+      }
 
       alert('依頼をキャンセルしました')
       loadData()
