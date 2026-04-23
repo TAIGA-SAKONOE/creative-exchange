@@ -2,7 +2,16 @@
 
 import { createClient } from '../../../lib/supabase/client'
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
+
+type MarketStatRow = {
+  median_price: number | null
+  avg_price: number | null
+  p25_price: number | null
+  p75_price: number | null
+  transaction_count: number
+  confidence_label: string
+}
 
 export default function NewRequest() {
   const [categories, setCategories] = useState<any[]>([])
@@ -10,19 +19,11 @@ export default function NewRequest() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [budget, setBudget] = useState('')
-  const [marketStats, setMarketStats] = useState<any>(null)
+  const [marketStats, setMarketStats] = useState<MarketStatRow | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
   const router = useRouter()
-  const searchParams = useSearchParams()
-
-  useEffect(() => {
-    const initialCategory = searchParams.get('category')
-    if (initialCategory) {
-      setSelectedCategory(initialCategory)
-    }
-  }, [searchParams])
 
   useEffect(() => {
     const initializePage = async () => {
@@ -74,7 +75,7 @@ export default function NewRequest() {
         return
       }
 
-      const stats =
+      const stats: MarketStatRow =
         Array.isArray(data) && data.length > 0
           ? data[0]
           : {
