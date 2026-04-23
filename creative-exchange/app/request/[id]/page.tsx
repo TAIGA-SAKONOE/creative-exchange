@@ -25,40 +25,64 @@ export default function RequestDetail() {
 
   const loadData = async () => {
     try {
+      setLoading(true)
+      setError(null)
+
       const supabase = createClient()
 
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: userProfile } = await supabase
-          .from('users')
-          .select('id, display_name')
-          .eq('auth_id', user.id)
-          .single()
-        setProfile(userProfile)
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
+
+      if (userError) throw userError
+      if (!user) {
+        setError('ログインが必要です')
+        return
       }
+
+      const { data: userProfile, error: profileError } = await supabase
+        .from('users')
+        .select('id, display_name')
+        .eq('auth_id', user.id)
+        .single()
+
+      if (profileError || !userProfile) {
+        setError('プロフィール情報の取得に失敗しました')
+        return
+      }
+
+      setProfile(userProfile)
 
       const { data: orderData, error: fetchError } = await supabase
         .from('orders')
-        .select(`*, categories (name)`)
+        .select(`
+          *,
+          categories (name)
+        `)
         .eq('id', id)
         .single()
 
-      if (fetchError) {
+      if (fetchError || !orderData) {
         setError('この依頼は存在しないか、閲覧権限がありません')
-      } else {
-        setRequest(orderData)
+        return
       }
 
-      const { data: files } = await supabase
+      setRequest(orderData)
+
+      const { data: files, error: filesError } = await supabase
         .from('deliverables')
         .select('*')
         .eq('order_id', id)
-        .order('created_at', { ascending: false })
+        .order('uploaded_at', { ascending: false })
 
-      if (files) setDeliverables(files)
-
-    } catch (err) {
-      setError('データの読み込み中にエラーが発生しました')
+      if (filesError) {
+        console.error('deliverables取得エラー', filesError)
+      } else {
+        setDeliverables(files ?? [])
+      }
+    } catch (err: any) {
+      setError(err.message || 'データの読み込み中にエラーが発生しました')
     } finally {
       setLoading(false)
     }
@@ -66,24 +90,29 @@ export default function RequestDetail() {
 
   const handleAccept = async () => {
     if (!profile?.id || !request) return
+
     const supabase = createClient()
     const { error } = await supabase
       .from('orders')
       .update({
         creator_id: profile.id,
         status: 'matched',
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq('id', id)
 
-    if (!error) {
-      alert('依頼を受注しました！')
-      loadData()
+    if (error) {
+      alert('受注に失敗しました: ' + error.message)
+      return
     }
+
+    alert('依頼を受注しました！')
+    loadData()
   }
 
   const handleDeliver = async () => {
     if (!selectedFile || !profile?.id) return
+
     setUploading(true)
     const supabase = createClient()
 
@@ -96,30 +125,40 @@ export default function RequestDetail() {
 
       if (uploadError) throw uploadError
 
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('deliverables').getPublicUrl(filePath)
+
       const { error: insertError } = await supabase
         .from('deliverables')
         .insert({
           order_id: id,
-          file_path: filePath,
-          file_name: selectedFile.name,
-          file_size: selectedFile.size,
-          mime_type: selectedFile.type
+          file_url: publicUrl,
+          file_type: selectedFile.type || null,
+          version: 1,
+          note: selectedFile.name,
         })
 
       if (insertError) throw insertError
 
-      await supabase
+      const { error: updateError } = await supabase
         .from('orders')
-        .update({ status: 'delivered', delivered_at: new Date().toISOString() })
+        .update({
+          status: 'delivered',
+          delivered_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', id)
 
+      if (updateError) throw updateError
+
       alert('納品が完了しました！')
+      setSelectedFile(null)
       loadData()
     } catch (err: any) {
       alert('納品に失敗しました: ' + err.message)
     } finally {
       setUploading(false)
-      setSelectedFile(null)
     }
   }
 
@@ -129,14 +168,18 @@ export default function RequestDetail() {
       .from('orders')
       .update({
         status: 'completed',
-        completed_at: new Date().toISOString()
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .eq('id', id)
 
-    if (!error) {
-      alert('取引が完了しました！')
-      loadData()
+    if (error) {
+      alert('検収に失敗しました: ' + error.message)
+      return
     }
+
+    alert('取引が完了しました！')
+    loadData()
   }
 
   if (loading) return <div className="p-12 text-center">読み込み中...</div>
@@ -146,8 +189,9 @@ export default function RequestDetail() {
   const isClient = profile?.id && String(request.client_id) === String(profile.id)
   const isCreator = profile?.id && String(request.creator_id) === String(profile.id)
 
-  const canAccept = request.status === 'draft' && !isClient
-  const canDeliver = isCreator && request.status === 'matched'
+  const canAccept = request.status === 'open' && !isClient && !request.creator_id
+  const canDeliver =
+    isCreator && ['matched', 'in_progress', 'revision'].includes(request.status)
   const canComplete = isClient && request.status === 'delivered'
   const canReview = (isClient || isCreator) && request.status === 'completed'
 
@@ -162,18 +206,21 @@ export default function RequestDetail() {
         </button>
 
         <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
-          {/* ヘッダー */}
           <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-10 text-white">
             <div className="flex justify-between items-start">
               <div>
                 <h1 className="text-4xl font-bold mb-2">{request.title}</h1>
                 <p className="text-xl opacity-90">{request.categories?.name}</p>
               </div>
-              <div className={`px-6 py-2 rounded-full text-sm font-medium bg-white/20 backdrop-blur-sm`}>
-                {request.status === 'draft' && '公開中'}
+              <div className="px-6 py-2 rounded-full text-sm font-medium bg-white/20 backdrop-blur-sm">
+                {request.status === 'draft' && '下書き'}
+                {request.status === 'open' && '公開中'}
                 {request.status === 'matched' && '受注済み'}
+                {request.status === 'in_progress' && '制作中'}
+                {request.status === 'revision' && '修正依頼中'}
                 {request.status === 'delivered' && '納品済み'}
                 {request.status === 'completed' && '取引完了'}
+                {request.status === 'cancelled' && 'キャンセル'}
               </div>
             </div>
           </div>
@@ -195,7 +242,6 @@ export default function RequestDetail() {
               </div>
             )}
 
-            {/* 納品ファイル */}
             {deliverables.length > 0 && (
               <div className="mb-10">
                 <p className="text-sm text-gray-500 mb-4">納品ファイル</p>
@@ -210,9 +256,11 @@ export default function RequestDetail() {
                     >
                       <div className="text-3xl">📎</div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{file.file_name}</p>
+                        <p className="font-medium truncate">{file.note || '納品ファイル'}</p>
                         <p className="text-xs text-gray-500">
-                          {new Date(file.created_at).toLocaleDateString('ja-JP')}
+                          {file.uploaded_at
+                            ? new Date(file.uploaded_at).toLocaleDateString('ja-JP')
+                            : ''}
                         </p>
                       </div>
                     </a>
@@ -221,7 +269,6 @@ export default function RequestDetail() {
               </div>
             )}
 
-            {/* アクションボタン */}
             <div className="space-y-4 pt-6 border-t">
               {canAccept && (
                 <button
@@ -267,6 +314,21 @@ export default function RequestDetail() {
                   取引を評価する
                 </button>
               )}
+            </div>
+
+            {/* 一時デバッグ表示 */}
+            <div className="mt-8 p-4 bg-gray-100 rounded-xl text-sm">
+              <p><strong>DEBUG</strong></p>
+              <p>profile.id: {String(profile?.id || '')}</p>
+              <p>request.client_id: {String(request.client_id || '')}</p>
+              <p>request.creator_id: {String(request.creator_id || '')}</p>
+              <p>request.status: {String(request.status || '')}</p>
+              <p>isClient: {String(!!isClient)}</p>
+              <p>isCreator: {String(!!isCreator)}</p>
+              <p>canAccept: {String(!!canAccept)}</p>
+              <p>canDeliver: {String(!!canDeliver)}</p>
+              <p>canComplete: {String(!!canComplete)}</p>
+              <p>deliverables: {deliverables.length}</p>
             </div>
           </div>
         </div>
