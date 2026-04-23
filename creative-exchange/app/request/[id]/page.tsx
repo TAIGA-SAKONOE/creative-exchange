@@ -185,16 +185,27 @@ export default function RequestDetail() {
   }
 
   if (loading) {
-    return <div className="p-12 text-center">読み込み中...</div>
-  }
+  return <LoadingState message="依頼詳細を読み込み中..." />
+}
 
-  if (error) {
-    return <div className="p-12 text-center text-red-600">{error}</div>
-  }
+if (error) {
+  return (
+    <MessageState
+      title="依頼詳細を表示できません"
+      message={error}
+      tone="error"
+    />
+  )
+}
 
-  if (!request) {
-    return <div className="p-12 text-center">依頼が見つかりません</div>
-  }
+if (!request) {
+  return (
+    <MessageState
+      title="依頼が見つかりません"
+      message="指定された依頼は存在しないか、現在は閲覧できません。"
+    />
+  )
+}
 
   const isClient = profile?.id && String(request.client_id) === String(profile.id)
   const isCreator = profile?.id && String(request.creator_id) === String(profile.id)
