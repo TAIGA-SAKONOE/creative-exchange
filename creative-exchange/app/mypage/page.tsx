@@ -56,36 +56,36 @@ export default function MyPage() {
           <h1 className="text-4xl font-bold">マイページ</h1>
           <Link 
             href="/request/new"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-medium"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-2xl font-medium shadow-sm"
           >
             新しい依頼を作成
           </Link>
         </div>
 
         {/* プロフィールカード */}
-        <div className="bg-white rounded-3xl shadow p-8 mb-10">
+        <div className="bg-white rounded-3xl shadow-lg p-8 mb-10">
           <div className="flex items-center gap-6">
-            <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center text-4xl text-white">
+            <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center text-5xl text-white shadow-inner">
               👤
             </div>
             <div>
               <h2 className="text-3xl font-bold">{user.display_name}</h2>
               <p className="text-xl text-gray-600">@{user.twitter_handle || '未設定'}</p>
-              {user.bio && <p className="mt-3 text-gray-700">{user.bio}</p>}
+              {user.bio && <p className="mt-4 text-gray-700 leading-relaxed">{user.bio}</p>}
             </div>
           </div>
 
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-4">
             <Link
               href={`/creator/${user.id}`}
-              className="bg-gradient-to-r from-purple-600 to-blue-600 text-white py-4 rounded-2xl font-medium text-center hover:brightness-110 transition flex items-center justify-center gap-2"
+              className="bg-gradient-to-r from-purple-600 to-blue-600 text-white py-4 rounded-2xl font-medium text-center hover:brightness-105 transition flex items-center justify-center gap-2 shadow-sm"
             >
               📊 自分の価格表を見る
             </Link>
 
             <Link
               href="/market"
-              className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-2xl font-medium text-center hover:brightness-110 transition flex items-center justify-center gap-2"
+              className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-2xl font-medium text-center hover:brightness-105 transition flex items-center justify-center gap-2 shadow-sm"
             >
               📈 相場ボードを見る
             </Link>
@@ -100,11 +100,11 @@ export default function MyPage() {
         </div>
 
         {/* 依頼一覧 */}
-        <div className="bg-white rounded-3xl shadow p-8">
+        <div className="bg-white rounded-3xl shadow-lg p-8">
           <h2 className="text-2xl font-bold mb-6">あなたの依頼一覧</h2>
 
           {requests.length === 0 ? (
-            <div className="text-center py-16 text-gray-500">
+            <div className="text-center py-20 text-gray-500">
               まだ依頼がありません<br />
               「新しい依頼を作成」から初めてみましょう
             </div>
@@ -114,17 +114,17 @@ export default function MyPage() {
                 <Link 
                   key={req.id}
                   href={`/request/${req.id}`}
-                  className="block border border-gray-200 hover:border-blue-300 rounded-2xl p-6 transition"
+                  className="block border border-gray-200 hover:border-blue-400 hover:shadow-md rounded-2xl p-6 transition-all duration-200"
                 >
                   <div className="flex justify-between items-start">
                     <div>
-                      <div className="font-medium">{req.title}</div>
+                      <div className="font-semibold text-lg">{req.title}</div>
                       <div className="text-sm text-gray-500 mt-1">
                         {req.categories?.name || '未分類'}
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className={`inline-block px-3 py-1 rounded-full text-xs font-medium
+                      <div className={`inline-block px-4 py-1 rounded-full text-xs font-medium
                         ${req.status === 'completed' ? 'bg-green-100 text-green-700' : 
                           req.status === 'matched' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
                         {req.status === 'draft' && '下書き'}
@@ -134,7 +134,7 @@ export default function MyPage() {
                         {req.status === 'completed' && '完了'}
                       </div>
                       {req.agreed_price && (
-                        <div className="mt-2 font-medium">¥{req.agreed_price.toLocaleString()}</div>
+                        <div className="mt-3 font-semibold text-lg">¥{req.agreed_price.toLocaleString()}</div>
                       )}
                     </div>
                   </div>
