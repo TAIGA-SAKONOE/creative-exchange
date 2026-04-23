@@ -49,6 +49,10 @@ export default function CreatorProfile() {
   if (loading) return <div className="p-12 text-center">読み込み中...</div>
   if (!creator) return <div className="p-12 text-center">クリエイターが見つかりません</div>
 
+  const visiblePrices = personalPrices.filter(
+    (item: any) => (item.transaction_count ?? 0) >= 3
+  )
+
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-4xl mx-auto px-4">
@@ -70,21 +74,23 @@ export default function CreatorProfile() {
                 <p className="text-xl opacity-90">@{creator.twitter_handle || 'no handle'}</p>
               </div>
             </div>
-            {creator.bio && <p className="mt-6 text-lg opacity-90 max-w-2xl">{creator.bio}</p>}
+            {creator.bio && (
+              <p className="mt-6 text-lg opacity-90 max-w-2xl">{creator.bio}</p>
+            )}
           </div>
 
           <div className="p-10">
             <h2 className="text-2xl font-bold mb-8">このクリエイターの価格表</h2>
 
-            {personalPrices.length === 0 ? (
+            {visiblePrices.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
-                まだ取引実績がありません
+                まだ十分な取引実績がありません
                 <br />
-                取引が蓄積されるとここに価格帯が表示されます
+                3件以上の取引が蓄積されるとここに価格帯が表示されます
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {personalPrices.map((item: any) => (
+                {visiblePrices.map((item: any) => (
                   <div
                     key={item.category_id}
                     className="bg-gray-50 border border-gray-200 rounded-2xl p-6"
