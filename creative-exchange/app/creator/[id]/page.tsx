@@ -3,6 +3,8 @@
 import { createClient } from '../../../lib/supabase/client'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import LoadingState from '../../components/LoadingState'
+import MessageState from '../../components/MessageState'
 
 export default function CreatorProfile() {
   const params = useParams()
@@ -10,19 +12,29 @@ export default function CreatorProfile() {
   const [creator, setCreator] = useState<any>(null)
   const [personalPrices, setPersonalPrices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
     const loadCreatorData = async () => {
-      const supabase = createClient()
+      try {
+        setLoading(true)
+        setError(null)
 
-      const { data: profile } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', creatorId)
-        .single()
+        const supabase = createClient()
 
-      if (profile) {
+        const { data: profile, error: profileError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', creatorId)
+          .single()
+
+        if (profileError) throw profileError
+        if (!profile) {
+          setCreator(null)
+          return
+        }
+
         setCreator(profile)
 
         const { data: prices, error: pricesError } = await supabase.rpc(
@@ -33,21 +45,41 @@ export default function CreatorProfile() {
           }
         )
 
-        if (pricesError) {
-          console.error('個人価格表取得エラー:', pricesError)
-        }
+        if (pricesError) throw pricesError
 
         setPersonalPrices(prices || [])
+      } catch (err: any) {
+        setError(err.message || '個人価格表の読み込みに失敗しました')
+      } finally {
+        setLoading(false)
       }
-
-      setLoading(false)
     }
 
     if (creatorId) loadCreatorData()
   }, [creatorId])
 
-  if (loading) return <div className="p-12 text-center">読み込み中...</div>
-  if (!creator) return <div className="p-12 text-center">クリエイターが見つかりません</div>
+  if (loading) {
+    return <LoadingState message="クリエイター情報を読み込み中..." />
+  }
+
+  if (error) {
+    return (
+      <MessageState
+        title="個人価格表を表示できません"
+        message={error}
+        tone="error"
+      />
+    )
+  }
+
+  if (!creator) {
+    return (
+      <MessageState
+        title="クリエイターが見つかりません"
+        message="指定されたプロフィールは存在しないか、現在は表示できません。"
+      />
+    )
+  }
 
   const visiblePrices = personalPrices.filter(
     (item: any) => (item.transaction_count ?? 0) >= 3
