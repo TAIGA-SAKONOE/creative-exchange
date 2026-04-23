@@ -168,6 +168,26 @@ export default function ExchangePage() {
     return String(creator.portfolio_urls)
   }
 
+  const getOrderDescription = (description: string | null) => {
+    if (!description) return '説明はありません'
+    if (description.length <= 120) return description
+    return `${description.slice(0, 120)}...`
+  }
+
+  const getOrderStatusChip = (order: OrderItem) => {
+    if (order.creator_id) {
+      return {
+        label: '受注済み',
+        className: 'bg-purple-50 text-purple-700 border border-purple-100',
+      }
+    }
+
+    return {
+      label: '公開中',
+      className: 'bg-green-50 text-green-700 border border-green-100',
+    }
+  }
+
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       const categoryName = getCategoryName(order)
@@ -293,11 +313,14 @@ export default function ExchangePage() {
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-6xl mx-auto px-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-10">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight">Exchange</h1>
-            <p className="mt-2 text-gray-600">
-              公開依頼を探して、そのまま受注できます
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-medium mb-4">
+              <span>Exchange</span>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight">案件を探す</h1>
+            <p className="mt-3 text-gray-600 text-lg">
+              公開依頼から受注先を探し、価格表やプロフィールも確認できます
             </p>
           </div>
 
@@ -338,7 +361,17 @@ export default function ExchangePage() {
         {activeTab === 'requests' ? (
           <>
             <div className="bg-white rounded-3xl shadow-xl p-8 mb-8">
-              <h2 className="text-2xl font-bold mb-6">依頼を検索</h2>
+              <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold">依頼を検索</h2>
+                  <p className="text-sm text-gray-500 mt-2">
+                    カテゴリ・タイトル・説明文から公開依頼を絞り込めます
+                  </p>
+                </div>
+                <div className="text-sm text-gray-500">
+                  公開中 {filteredOrders.length} 件
+                </div>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
@@ -383,8 +416,12 @@ export default function ExchangePage() {
             </div>
 
             {filteredOrders.length === 0 ? (
-              <div className="bg-white rounded-3xl shadow-xl p-12 text-center text-gray-500">
-                条件に合う公開依頼がありません
+              <div className="bg-white rounded-3xl shadow-xl p-14 text-center">
+                <div className="text-5xl mb-4">🔎</div>
+                <h3 className="text-xl font-bold mb-2">公開依頼が見つかりません</h3>
+                <p className="text-gray-500">
+                  検索条件をゆるめると、表示される場合があります
+                </p>
               </div>
             ) : (
               <div className="grid gap-6">
@@ -394,36 +431,33 @@ export default function ExchangePage() {
                     order.status === 'open' &&
                     !order.creator_id &&
                     !isOwnOrder
+                  const statusChip = getOrderStatusChip(order)
 
                   return (
                     <div
                       key={order.id}
-                      className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100"
+                      className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 hover:shadow-2xl transition-shadow"
                     >
-                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+                      <div className="flex flex-col xl:flex-row xl:items-stretch gap-8">
                         <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-3 mb-4">
-                            <span className="inline-flex px-4 py-1.5 rounded-full bg-blue-50 text-blue-700 text-sm font-medium">
+                          <div className="flex flex-wrap items-center gap-3 mb-5">
+                            <span className="inline-flex px-4 py-1.5 rounded-full bg-blue-50 text-blue-700 text-sm font-medium border border-blue-100">
                               {getCategoryName(order)}
                             </span>
 
-                            <span className="inline-flex px-4 py-1.5 rounded-full bg-green-50 text-green-700 text-sm font-medium">
-                              公開中
+                            <span className={`inline-flex px-4 py-1.5 rounded-full text-sm font-medium ${statusChip.className}`}>
+                              {statusChip.label}
                             </span>
                           </div>
 
                           <Link href={`/request/${order.id}`} className="block">
-                            <h3 className="text-2xl font-bold mb-3 hover:text-blue-600 transition">
+                            <h3 className="text-3xl font-bold mb-3 hover:text-blue-600 transition">
                               {order.title}
                             </h3>
                           </Link>
 
-                          <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-                            {order.description
-                              ? order.description.length > 140
-                                ? order.description.slice(0, 140) + '...'
-                                : order.description
-                              : '説明はありません'}
+                          <p className="text-gray-700 leading-8 text-base">
+                            {getOrderDescription(order.description)}
                           </p>
 
                           <div className="mt-6 flex flex-wrap items-center gap-6 text-sm text-gray-500">
@@ -436,17 +470,17 @@ export default function ExchangePage() {
                           </div>
                         </div>
 
-                        <div className="w-full lg:w-72 shrink-0">
-                          <div className="bg-gray-50 rounded-3xl p-6 mb-4">
+                        <div className="w-full xl:w-80 shrink-0 flex flex-col">
+                          <div className="bg-gray-50 rounded-3xl p-6 mb-4 border border-gray-100">
                             <p className="text-sm text-gray-500 mb-2">希望予算</p>
-                            <p className="text-3xl font-bold text-blue-600">
+                            <p className="text-4xl font-bold text-blue-600 tracking-tight">
                               {order.agreed_price
                                 ? `¥${Number(order.agreed_price).toLocaleString()}`
                                 : '未設定'}
                             </p>
                           </div>
 
-                          <div className="space-y-3">
+                          <div className="space-y-3 mt-auto">
                             <button
                               onClick={() => handleAccept(order.id)}
                               disabled={!canAccept || acceptingOrderId === order.id}
@@ -460,7 +494,7 @@ export default function ExchangePage() {
                                 ? '自分の依頼です'
                                 : acceptingOrderId === order.id
                                   ? '受注中...'
-                                  : '受注する'}
+                                  : 'この依頼を受注する'}
                             </button>
 
                             <Link
@@ -481,7 +515,17 @@ export default function ExchangePage() {
         ) : (
           <>
             <div className="bg-white rounded-3xl shadow-xl p-8 mb-8">
-              <h2 className="text-2xl font-bold mb-6">クリエイターを検索</h2>
+              <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold">クリエイターを検索</h2>
+                  <p className="text-sm text-gray-500 mt-2">
+                    表示名・自己紹介・スキルから探せます
+                  </p>
+                </div>
+                <div className="text-sm text-gray-500">
+                  表示中 {filteredCreators.length} 人
+                </div>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
@@ -526,8 +570,12 @@ export default function ExchangePage() {
             </div>
 
             {filteredCreators.length === 0 ? (
-              <div className="bg-white rounded-3xl shadow-xl p-12 text-center text-gray-500">
-                条件に合うクリエイターがいません
+              <div className="bg-white rounded-3xl shadow-xl p-14 text-center">
+                <div className="text-5xl mb-4">🎨</div>
+                <h3 className="text-xl font-bold mb-2">条件に合うクリエイターがいません</h3>
+                <p className="text-gray-500">
+                  検索条件を変えると、表示される場合があります
+                </p>
               </div>
             ) : (
               <div className="grid gap-6">
@@ -537,11 +585,11 @@ export default function ExchangePage() {
                   return (
                     <div
                       key={creator.id}
-                      className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100"
+                      className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 hover:shadow-2xl transition-shadow"
                     >
-                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+                      <div className="flex flex-col xl:flex-row xl:items-stretch gap-8">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-4 mb-5">
+                          <div className="flex items-center gap-4 mb-6">
                             <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-2xl shadow-inner">
                               👤
                             </div>
@@ -556,28 +604,28 @@ export default function ExchangePage() {
                             </div>
                           </div>
 
-                          <div className="mb-5">
+                          <div className="mb-6">
                             <p className="text-sm text-gray-500 mb-2">自己紹介</p>
-                            <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                            <p className="text-gray-700 leading-8 whitespace-pre-wrap">
                               {creator.bio || '自己紹介は未設定です'}
                             </p>
                           </div>
 
-                          <div className="mb-2">
+                          <div>
                             <p className="text-sm text-gray-500 mb-2">スキル</p>
                             <p className="text-gray-700">{getSkillText(creator)}</p>
                           </div>
                         </div>
 
-                        <div className="w-full lg:w-72 shrink-0">
-                          <div className="bg-gray-50 rounded-3xl p-6 mb-4">
-                            <p className="text-sm text-gray-500 mb-2">プロフィール</p>
+                        <div className="w-full xl:w-80 shrink-0 flex flex-col">
+                          <div className="bg-gray-50 rounded-3xl p-6 mb-4 border border-gray-100">
+                            <p className="text-sm text-gray-500 mb-2">プロフィール導線</p>
                             <p className="text-lg font-semibold text-gray-900">
-                              価格表や詳細を確認できます
+                              価格表や外部ポートフォリオを確認できます
                             </p>
                           </div>
 
-                          <div className="space-y-3">
+                          <div className="space-y-3 mt-auto">
                             <Link
                               href={`/creator/${creator.id}`}
                               className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-medium transition shadow-sm"
