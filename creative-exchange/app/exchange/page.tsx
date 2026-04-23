@@ -25,6 +25,15 @@ type OrderItem = {
   categories?: CategoryValue
 }
 
+type CreatorItem = {
+  id: string
+  display_name: string | null
+  bio: string | null
+  twitter_handle: string | null
+  skills: string[] | string | null
+  portfolio_urls: string[] | string | null
+}
+
 export default function ExchangePage() {
   const router = useRouter()
 
@@ -33,12 +42,17 @@ export default function ExchangePage() {
 
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null)
   const [orders, setOrders] = useState<OrderItem[]>([])
+  const [creators, setCreators] = useState<CreatorItem[]>([])
   const [activeTab, setActiveTab] = useState<'requests' | 'creators'>('requests')
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null)
 
   const [categoryKeyword, setCategoryKeyword] = useState('')
   const [titleKeyword, setTitleKeyword] = useState('')
   const [descriptionKeyword, setDescriptionKeyword] = useState('')
+
+  const [creatorNameKeyword, setCreatorNameKeyword] = useState('')
+  const [creatorBioKeyword, setCreatorBioKeyword] = useState('')
+  const [creatorSkillKeyword, setCreatorSkillKeyword] = useState('')
 
   useEffect(() => {
     const loadExchangePage = async () => {
@@ -101,6 +115,23 @@ export default function ExchangePage() {
         }
 
         setOrders((openOrders ?? []) as unknown as OrderItem[])
+
+        const { data: creatorRows, error: creatorsError } = await supabase
+          .from('users')
+          .select('id, display_name, bio, twitter_handle, skills, portfolio_urls')
+          .order('created_at', { ascending: false })
+
+        if (creatorsError) {
+          setError(creatorsError.message || 'クリエイター一覧の取得に失敗しました')
+          setLoading(false)
+          return
+        }
+
+        const filteredCreatorRows = ((creatorRows ?? []) as CreatorItem[]).filter(
+          (creator) => creator.id !== profile.id
+        )
+
+        setCreators(filteredCreatorRows)
       } catch (err: any) {
         setError(err?.message || '読み込み中にエラーが発生しました')
       } finally {
@@ -119,6 +150,22 @@ export default function ExchangePage() {
     }
 
     return order.categories.name || '未分類'
+  }
+
+  const getSkillText = (creator: CreatorItem) => {
+    if (!creator.skills) return '未設定'
+    if (Array.isArray(creator.skills)) {
+      return creator.skills.filter(Boolean).join(' / ') || '未設定'
+    }
+    return String(creator.skills)
+  }
+
+  const getFirstPortfolioUrl = (creator: CreatorItem) => {
+    if (!creator.portfolio_urls) return null
+    if (Array.isArray(creator.portfolio_urls)) {
+      return creator.portfolio_urls[0] || null
+    }
+    return String(creator.portfolio_urls)
   }
 
   const filteredOrders = useMemo(() => {
@@ -142,6 +189,28 @@ export default function ExchangePage() {
       return matchCategory && matchTitle && matchDescription
     })
   }, [orders, categoryKeyword, titleKeyword, descriptionKeyword])
+
+  const filteredCreators = useMemo(() => {
+    return creators.filter((creator) => {
+      const displayName = creator.display_name || ''
+      const bio = creator.bio || ''
+      const skillsText = getSkillText(creator)
+
+      const matchName =
+        creatorNameKeyword.trim() === '' ||
+        displayName.toLowerCase().includes(creatorNameKeyword.toLowerCase())
+
+      const matchBio =
+        creatorBioKeyword.trim() === '' ||
+        bio.toLowerCase().includes(creatorBioKeyword.toLowerCase())
+
+      const matchSkill =
+        creatorSkillKeyword.trim() === '' ||
+        skillsText.toLowerCase().includes(creatorSkillKeyword.toLowerCase())
+
+      return matchName && matchBio && matchSkill
+    })
+  }, [creators, creatorNameKeyword, creatorBioKeyword, creatorSkillKeyword])
 
   const handleAccept = async (orderId: string) => {
     if (!currentUser?.id) {
@@ -201,7 +270,7 @@ export default function ExchangePage() {
       <div className="min-h-screen bg-gray-50 py-12">
         <div className="max-w-6xl mx-auto px-4">
           <div className="bg-white rounded-3xl shadow-xl p-10 text-center text-gray-600">
-            依頼一覧を読み込み中...
+            Exchangeを読み込み中...
           </div>
         </div>
       </div>
@@ -410,10 +479,135 @@ export default function ExchangePage() {
             )}
           </>
         ) : (
-          <div className="bg-white rounded-3xl shadow-xl p-12 text-center">
-            <h2 className="text-2xl font-bold mb-3">クリエイター一覧</h2>
-            <p className="text-gray-600">このタブは Step 2 で実装します</p>
-          </div>
+          <>
+            <div className="bg-white rounded-3xl shadow-xl p-8 mb-8">
+              <h2 className="text-2xl font-bold mb-6">クリエイターを検索</h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                    表示名
+                  </label>
+                  <input
+                    type="text"
+                    value={creatorNameKeyword}
+                    onChange={(e) => setCreatorNameKeyword(e.target.value)}
+                    placeholder="例: 山田太郎"
+                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                    自己紹介
+                  </label>
+                  <input
+                    type="text"
+                    value={creatorBioKeyword}
+                    onChange={(e) => setCreatorBioKeyword(e.target.value)}
+                    placeholder="例: イラスト / 書家"
+                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                    スキル
+                  </label>
+                  <input
+                    type="text"
+                    value={creatorSkillKeyword}
+                    onChange={(e) => setCreatorSkillKeyword(e.target.value)}
+                    placeholder="例: MV / ロゴ / 作詞"
+                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {filteredCreators.length === 0 ? (
+              <div className="bg-white rounded-3xl shadow-xl p-12 text-center text-gray-500">
+                条件に合うクリエイターがいません
+              </div>
+            ) : (
+              <div className="grid gap-6">
+                {filteredCreators.map((creator) => {
+                  const portfolioUrl = getFirstPortfolioUrl(creator)
+
+                  return (
+                    <div
+                      key={creator.id}
+                      className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100"
+                    >
+                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-4 mb-5">
+                            <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-2xl shadow-inner">
+                              👤
+                            </div>
+
+                            <div>
+                              <h3 className="text-2xl font-bold">
+                                {creator.display_name || '名称未設定'}
+                              </h3>
+                              <p className="text-gray-500">
+                                @{creator.twitter_handle || '未設定'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="mb-5">
+                            <p className="text-sm text-gray-500 mb-2">自己紹介</p>
+                            <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                              {creator.bio || '自己紹介は未設定です'}
+                            </p>
+                          </div>
+
+                          <div className="mb-2">
+                            <p className="text-sm text-gray-500 mb-2">スキル</p>
+                            <p className="text-gray-700">{getSkillText(creator)}</p>
+                          </div>
+                        </div>
+
+                        <div className="w-full lg:w-72 shrink-0">
+                          <div className="bg-gray-50 rounded-3xl p-6 mb-4">
+                            <p className="text-sm text-gray-500 mb-2">プロフィール</p>
+                            <p className="text-lg font-semibold text-gray-900">
+                              価格表や詳細を確認できます
+                            </p>
+                          </div>
+
+                          <div className="space-y-3">
+                            <Link
+                              href={`/creator/${creator.id}`}
+                              className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-medium transition shadow-sm"
+                            >
+                              価格表を見る
+                            </Link>
+
+                            {portfolioUrl ? (
+                              <a
+                                href={portfolioUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block w-full text-center border border-gray-200 hover:bg-gray-50 py-4 rounded-2xl font-medium transition"
+                              >
+                                ポートフォリオを見る
+                              </a>
+                            ) : (
+                              <div className="block w-full text-center border border-gray-200 text-gray-400 py-4 rounded-2xl font-medium">
+                                ポートフォリオ未設定
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
