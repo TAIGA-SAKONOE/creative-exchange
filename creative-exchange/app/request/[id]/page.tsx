@@ -37,7 +37,7 @@ export default function RequestDetail() {
 
       if (userError) throw userError
       if (!user) {
-        setError('ログインが必要です')
+        router.replace('/login')
         return
       }
 
