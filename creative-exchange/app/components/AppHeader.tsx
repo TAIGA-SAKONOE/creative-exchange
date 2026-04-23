@@ -35,6 +35,12 @@ export default function AppHeader() {
               マイページ
             </Link>
             <Link
+              href="/exchange"
+              className="px-3 py-2 rounded-xl hover:bg-gray-100 transition"
+            >
+              Exchange
+            </Link>
+            <Link
               href="/market"
               className="px-3 py-2 rounded-xl hover:bg-gray-100 transition"
             >
