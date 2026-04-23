@@ -83,6 +83,14 @@ export default function MyPage() {
     return 'bg-gray-100 text-gray-600'
   }
 
+  const getSkillText = (skills: any) => {
+    if (!skills) return '未設定'
+    if (Array.isArray(skills)) {
+      return skills.filter(Boolean).join(' / ') || '未設定'
+    }
+    return String(skills)
+  }
+
   if (loading) return <div className="p-12 text-center">読み込み中...</div>
   if (!user) return <div>ログインしてください</div>
 
@@ -91,20 +99,12 @@ export default function MyPage() {
       <div className="max-w-4xl mx-auto px-4">
         <div className="flex justify-between items-center mb-12">
           <h1 className="text-4xl font-bold tracking-tight">マイページ</h1>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/exchange"
-              className="border border-gray-300 hover:bg-gray-50 px-6 py-3.5 rounded-2xl font-medium transition"
-            >
-              Exchangeを見る
-            </Link>
-            <Link
-              href="/request/new"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3.5 rounded-2xl font-medium shadow-sm transition"
-            >
-              新しい依頼を作成
-            </Link>
-          </div>
+          <Link
+            href="/request/new"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3.5 rounded-2xl font-medium shadow-sm transition"
+          >
+            新しい依頼を作成
+          </Link>
         </div>
 
         <div className="bg-white rounded-3xl shadow-xl p-10 mb-12">
@@ -115,11 +115,17 @@ export default function MyPage() {
             <div className="flex-1">
               <h2 className="text-4xl font-bold mb-1">{user.display_name}</h2>
               <p className="text-2xl text-gray-600">@{user.twitter_handle || '未設定'}</p>
+
               {user.bio && (
                 <p className="mt-6 text-lg text-gray-700 leading-relaxed">
                   {user.bio}
                 </p>
               )}
+
+              <div className="mt-6">
+                <p className="text-sm font-medium text-gray-500 mb-2">スキル</p>
+                <p className="text-gray-700 leading-relaxed">{getSkillText(user.skills)}</p>
+              </div>
             </div>
           </div>
 
