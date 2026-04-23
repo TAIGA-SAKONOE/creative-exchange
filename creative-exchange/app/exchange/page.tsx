@@ -9,6 +9,10 @@ type UserProfile = {
   id: string
   auth_id: string
   display_name: string | null
+  bio?: string | null
+  twitter_handle?: string | null
+  skills?: string[] | string | null
+  portfolio_urls?: string[] | string | null
 }
 
 type CategoryValue = { name: string }[] | { name: string } | null
@@ -80,7 +84,7 @@ export default function ExchangePage() {
 
         const { data: profile, error: profileError } = await supabase
           .from('users')
-          .select('id, auth_id, display_name')
+          .select('id, auth_id, display_name, bio, twitter_handle, skills, portfolio_urls')
           .eq('auth_id', authUser.id)
           .single()
 
@@ -152,20 +156,24 @@ export default function ExchangePage() {
     return order.categories.name || '未分類'
   }
 
-  const getSkillText = (creator: CreatorItem) => {
-    if (!creator.skills) return '未設定'
-    if (Array.isArray(creator.skills)) {
-      return creator.skills.filter(Boolean).join(' / ') || '未設定'
+  const getSkillText = (
+    target: { skills?: string[] | string | null } | CreatorItem | UserProfile
+  ) => {
+    if (!target.skills) return '未設定'
+    if (Array.isArray(target.skills)) {
+      return target.skills.filter(Boolean).join(' / ') || '未設定'
     }
-    return String(creator.skills)
+    return String(target.skills)
   }
 
-  const getFirstPortfolioUrl = (creator: CreatorItem) => {
-    if (!creator.portfolio_urls) return null
-    if (Array.isArray(creator.portfolio_urls)) {
-      return creator.portfolio_urls[0] || null
+  const getFirstPortfolioUrl = (
+    target: { portfolio_urls?: string[] | string | null } | CreatorItem | UserProfile
+  ) => {
+    if (!target.portfolio_urls) return null
+    if (Array.isArray(target.portfolio_urls)) {
+      return target.portfolio_urls[0] || null
     }
-    return String(creator.portfolio_urls)
+    return String(target.portfolio_urls)
   }
 
   const getOrderDescription = (description: string | null) => {
@@ -514,6 +522,84 @@ export default function ExchangePage() {
           </>
         ) : (
           <>
+            {currentUser && (
+              <div className="bg-white rounded-3xl shadow-xl p-8 mb-8 border border-blue-100">
+                <div className="flex flex-col xl:flex-row xl:items-stretch gap-8">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center text-white text-2xl shadow-inner">
+                        👤
+                      </div>
+
+                      <div>
+                        <div className="inline-flex px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium mb-2">
+                          あなたのプロフィール
+                        </div>
+                        <h3 className="text-2xl font-bold">
+                          {currentUser.display_name || '名称未設定'}
+                        </h3>
+                        <p className="text-gray-500">
+                          @{currentUser.twitter_handle || '未設定'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mb-6">
+                      <p className="text-sm text-gray-500 mb-2">自己紹介</p>
+                      <p className="text-gray-700 leading-8 whitespace-pre-wrap">
+                        {currentUser.bio || '自己紹介は未設定です'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-gray-500 mb-2">スキル</p>
+                      <p className="text-gray-700">{getSkillText(currentUser)}</p>
+                    </div>
+                  </div>
+
+                  <div className="w-full xl:w-80 shrink-0 flex flex-col">
+                    <div className="bg-gray-50 rounded-3xl p-6 mb-4 border border-gray-100">
+                      <p className="text-sm text-gray-500 mb-2">プロフィール状況</p>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-500">プロフィール閲覧</span>
+                          <span className="font-semibold text-gray-900">今後追加予定</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-500">価格表確認</span>
+                          <span className="font-semibold text-gray-900">導線あり</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 mt-auto">
+                      <Link
+                        href={`/creator/${currentUser.id}`}
+                        className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-medium transition shadow-sm"
+                      >
+                        自分の価格表を見る
+                      </Link>
+
+                      {getFirstPortfolioUrl(currentUser) ? (
+                        <a
+                          href={getFirstPortfolioUrl(currentUser) || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block w-full text-center border border-gray-200 hover:bg-gray-50 py-4 rounded-2xl font-medium transition"
+                        >
+                          自分のポートフォリオを見る
+                        </a>
+                      ) : (
+                        <div className="block w-full text-center border border-gray-200 text-gray-400 py-4 rounded-2xl font-medium">
+                          ポートフォリオ未設定
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="bg-white rounded-3xl shadow-xl p-8 mb-8">
               <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
                 <div>
