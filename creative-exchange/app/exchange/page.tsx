@@ -11,6 +11,8 @@ type UserProfile = {
   display_name: string | null
 }
 
+type CategoryValue = { name: string }[] | { name: string } | null
+
 type OrderItem = {
   id: string
   client_id: string
@@ -20,9 +22,7 @@ type OrderItem = {
   agreed_price: number | null
   status: string
   created_at: string
-  categories?: {
-    name: string
-  } | null
+  categories?: CategoryValue
 }
 
 export default function ExchangePage() {
@@ -76,7 +76,7 @@ export default function ExchangePage() {
           return
         }
 
-        setCurrentUser(profile)
+        setCurrentUser(profile as UserProfile)
 
         const { data: openOrders, error: ordersError } = await supabase
           .from('orders')
@@ -100,7 +100,7 @@ export default function ExchangePage() {
           return
         }
 
-        setOrders((openOrders as OrderItem[]) || [])
+        setOrders((openOrders ?? []) as unknown as OrderItem[])
       } catch (err: any) {
         setError(err?.message || '読み込み中にエラーが発生しました')
       } finally {
@@ -111,9 +111,19 @@ export default function ExchangePage() {
     loadExchangePage()
   }, [])
 
+  const getCategoryName = (order: OrderItem) => {
+    if (!order.categories) return '未分類'
+
+    if (Array.isArray(order.categories)) {
+      return order.categories[0]?.name || '未分類'
+    }
+
+    return order.categories.name || '未分類'
+  }
+
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
-      const categoryName = order.categories?.name || ''
+      const categoryName = getCategoryName(order)
       const title = order.title || ''
       const description = order.description || ''
 
@@ -325,7 +335,7 @@ export default function ExchangePage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-3 mb-4">
                             <span className="inline-flex px-4 py-1.5 rounded-full bg-blue-50 text-blue-700 text-sm font-medium">
-                              {order.categories?.name || '未分類'}
+                              {getCategoryName(order)}
                             </span>
 
                             <span className="inline-flex px-4 py-1.5 rounded-full bg-green-50 text-green-700 text-sm font-medium">
