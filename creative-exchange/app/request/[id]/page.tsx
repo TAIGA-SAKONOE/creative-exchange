@@ -5,6 +5,7 @@ import MessageState from '../../components/MessageState'
 import { createClient } from '../../../lib/supabase/client'
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import Link from 'next/link'
 
 export default function RequestDetail() {
   const params = useParams()
@@ -20,6 +21,7 @@ export default function RequestDetail() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [messageText, setMessageText] = useState('')
   const [sendingMessage, setSendingMessage] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
 
   const router = useRouter()
 
@@ -247,6 +249,43 @@ export default function RequestDetail() {
     }
   }
 
+  const handleCancel = async () => {
+    if (!profile?.id || !request || cancelling) return
+
+    const reason = window.prompt('キャンセル理由を入力してください（必須）')
+    if (reason === null) return
+    if (!reason.trim()) {
+      alert('キャンセル理由を入力してください')
+      return
+    }
+
+    setCancelling(true)
+
+    try {
+      const supabase = createClient()
+
+      const { error: cancelError } = await supabase
+        .from('orders')
+        .update({
+          status: 'cancelled',
+          cancel_reason: reason.trim(),
+          cancelled_by_user_id: profile.id,
+          cancelled_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+
+      if (cancelError) throw cancelError
+
+      alert('依頼をキャンセルしました')
+      loadData()
+    } catch (err: any) {
+      alert('キャンセルに失敗しました: ' + err.message)
+    } finally {
+      setCancelling(false)
+    }
+  }
+
   const getDeadlineMeta = (deadline: string) => {
     const today = new Date()
     const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
@@ -324,6 +363,10 @@ export default function RequestDetail() {
   const canComplete = isClient && request.status === 'delivered'
   const canReview = (isClient || isCreator) && request.status === 'completed'
   const canMessage = request.status === 'open' || isClient || isCreator
+  const canEdit = isClient && ['draft', 'open'].includes(request.status)
+  const canCancel =
+    (isClient || isCreator) &&
+    ['open', 'matched', 'in_progress', 'revision'].includes(request.status)
 
   const statusLabel =
     request.status === 'draft'
@@ -368,6 +411,27 @@ export default function RequestDetail() {
           </div>
 
           <div className="p-10">
+            <div className="mb-6 flex flex-wrap gap-3">
+              {canEdit && (
+                <Link
+                  href={`/request/${id}/edit`}
+                  className="inline-flex items-center justify-center px-5 py-3 rounded-2xl border border-gray-200 hover:bg-gray-50 font-medium transition"
+                >
+                  依頼を編集する
+                </Link>
+              )}
+
+              {canCancel && (
+                <button
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                  className="inline-flex items-center justify-center px-5 py-3 rounded-2xl bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-medium transition"
+                >
+                  {cancelling ? 'キャンセル中...' : '依頼をキャンセルする'}
+                </button>
+              )}
+            </div>
+
             <div className="mb-10">
               <p className="text-sm text-gray-500 mb-2">依頼内容</p>
               <p className="text-gray-700 whitespace-pre-wrap leading-relaxed text-lg">
@@ -399,6 +463,21 @@ export default function RequestDetail() {
                 </div>
               )
             })()}
+
+            {request.status === 'cancelled' && (
+              <div className="mb-10 p-6 bg-red-50 rounded-2xl border border-red-100">
+                <p className="text-sm text-red-700 mb-2">キャンセル情報</p>
+                <p className="text-lg font-semibold text-red-600 mb-2">この依頼はキャンセルされました</p>
+                <p className="text-sm text-red-700 whitespace-pre-wrap">
+                  理由: {request.cancel_reason || '理由未入力'}
+                </p>
+                {request.cancelled_at && (
+                  <p className="text-xs text-red-500 mt-2">
+                    キャンセル日時: {new Date(request.cancelled_at).toLocaleString('ja-JP')}
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="mb-10">
               <p className="text-sm text-gray-500 mb-4">納品ファイル</p>
