@@ -182,9 +182,17 @@ export default function RequestDetail() {
     loadData()
   }
 
-  if (loading) return <div className="p-12 text-center">読み込み中...</div>
-  if (error) return <div className="p-12 text-center text-red-600">{error}</div>
-  if (!request) return <div className="p-12 text-center">依頼が見つかりません</div>
+  if (loading) {
+    return <div className="p-12 text-center">読み込み中...</div>
+  }
+
+  if (error) {
+    return <div className="p-12 text-center text-red-600">{error}</div>
+  }
+
+  if (!request) {
+    return <div className="p-12 text-center">依頼が見つかりません</div>
+  }
 
   const isClient = profile?.id && String(request.client_id) === String(profile.id)
   const isCreator = profile?.id && String(request.creator_id) === String(profile.id)
@@ -194,6 +202,25 @@ export default function RequestDetail() {
     isCreator && ['matched', 'in_progress', 'revision'].includes(request.status)
   const canComplete = isClient && request.status === 'delivered'
   const canReview = (isClient || isCreator) && request.status === 'completed'
+
+  const statusLabel =
+    request.status === 'draft'
+      ? '下書き'
+      : request.status === 'open'
+        ? '公開中'
+        : request.status === 'matched'
+          ? '受注済み'
+          : request.status === 'in_progress'
+            ? '制作中'
+            : request.status === 'revision'
+              ? '修正依頼中'
+              : request.status === 'delivered'
+                ? '納品済み'
+                : request.status === 'completed'
+                  ? '取引完了'
+                  : request.status === 'cancelled'
+                    ? 'キャンセル'
+                    : request.status
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -207,20 +234,13 @@ export default function RequestDetail() {
 
         <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
           <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-10 text-white">
-            <div className="flex justify-between items-start">
+            <div className="flex justify-between items-start gap-6">
               <div>
                 <h1 className="text-4xl font-bold mb-2">{request.title}</h1>
                 <p className="text-xl opacity-90">{request.categories?.name}</p>
               </div>
-              <div className="px-6 py-2 rounded-full text-sm font-medium bg-white/20 backdrop-blur-sm">
-                {request.status === 'draft' && '下書き'}
-                {request.status === 'open' && '公開中'}
-                {request.status === 'matched' && '受注済み'}
-                {request.status === 'in_progress' && '制作中'}
-                {request.status === 'revision' && '修正依頼中'}
-                {request.status === 'delivered' && '納品済み'}
-                {request.status === 'completed' && '取引完了'}
-                {request.status === 'cancelled' && 'キャンセル'}
+              <div className="px-6 py-2 rounded-full text-sm font-medium bg-white/20 backdrop-blur-sm whitespace-nowrap">
+                {statusLabel}
               </div>
             </div>
           </div>
@@ -242,9 +262,10 @@ export default function RequestDetail() {
               </div>
             )}
 
-            {deliverables.length > 0 && (
-              <div className="mb-10">
-                <p className="text-sm text-gray-500 mb-4">納品ファイル</p>
+            <div className="mb-10">
+              <p className="text-sm text-gray-500 mb-4">納品ファイル</p>
+
+              {deliverables.length > 0 ? (
                 <div className="space-y-3">
                   {deliverables.map((file: any) => (
                     <a
@@ -256,7 +277,9 @@ export default function RequestDetail() {
                     >
                       <div className="text-3xl">📎</div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{file.note || '納品ファイル'}</p>
+                        <p className="font-medium truncate">
+                          {file.note || '納品ファイル'}
+                        </p>
                         <p className="text-xs text-gray-500">
                           {file.uploaded_at
                             ? new Date(file.uploaded_at).toLocaleDateString('ja-JP')
@@ -266,8 +289,12 @@ export default function RequestDetail() {
                     </a>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="p-5 bg-gray-50 rounded-2xl text-gray-500 text-sm">
+                  まだ納品ファイルはありません
+                </div>
+              )}
+            </div>
 
             <div className="space-y-4 pt-6 border-t">
               {canAccept && (
@@ -314,21 +341,6 @@ export default function RequestDetail() {
                   取引を評価する
                 </button>
               )}
-            </div>
-
-            {/* 一時デバッグ表示 */}
-            <div className="mt-8 p-4 bg-gray-100 rounded-xl text-sm">
-              <p><strong>DEBUG</strong></p>
-              <p>profile.id: {String(profile?.id || '')}</p>
-              <p>request.client_id: {String(request.client_id || '')}</p>
-              <p>request.creator_id: {String(request.creator_id || '')}</p>
-              <p>request.status: {String(request.status || '')}</p>
-              <p>isClient: {String(!!isClient)}</p>
-              <p>isCreator: {String(!!isCreator)}</p>
-              <p>canAccept: {String(!!canAccept)}</p>
-              <p>canDeliver: {String(!!canDeliver)}</p>
-              <p>canComplete: {String(!!canComplete)}</p>
-              <p>deliverables: {deliverables.length}</p>
             </div>
           </div>
         </div>
