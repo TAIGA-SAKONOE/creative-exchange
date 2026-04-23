@@ -31,6 +31,8 @@ export default function MarketPage() {
             p_days: 90
           })
 
+console.log('market stats', category.name, stats)
+        
         results.push({
           ...category,
           stats: stats || { count: 0, median: 0, p25: 0, p75: 0 }
