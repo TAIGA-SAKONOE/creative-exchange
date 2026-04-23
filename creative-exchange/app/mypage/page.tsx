@@ -56,7 +56,7 @@ export default function MyPage() {
           <h1 className="text-4xl font-bold">マイページ</h1>
           <Link 
             href="/request/new"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-medium"
           >
             新しい依頼を作成
           </Link>
@@ -75,7 +75,6 @@ export default function MyPage() {
             </div>
           </div>
 
-          {/* ボタンエリア（価格表 → 相場ボード → プロフィール編集） */}
           <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
             <Link
               href={`/creator/${user.id}`}
