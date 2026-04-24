@@ -90,8 +90,8 @@ export default function NewListing() {
 
   if (loading) return <div className="p-12 text-center">読み込み中...</div>
 
-  const parentCategories = categories.filter(c => !c.parent_id)
-  const childCategories = categories.filter(c => c.parent_id)
+  
+  
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -122,13 +122,8 @@ export default function NewListing() {
                 onChange={(e) => setCategoryId(e.target.value)}
                 className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200"
               >
-                <option value="">選択してください</option>
-                {parentCategories.map(parent => (
-                  <optgroup key={parent.id} label={parent.name}>
-                    {childCategories.filter(c => c.parent_id === parent.id).map(child => (
-                      <option key={child.id} value={child.id}>{child.name}</option>
-                    ))}
-                  </optgroup>
+                {categories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
               </select>
             </div>
