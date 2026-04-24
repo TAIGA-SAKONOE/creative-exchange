@@ -601,6 +601,34 @@ export default function ExchangePage() {
         return
       }
 
+      const { error: updateError } = await supabase
+  .from('orders')
+  .update({
+    creator_id: currentUser.id,
+    status: 'matched',
+    updated_at: new Date().toISOString(),
+  })
+  .eq('id', orderId)
+  .eq('status', 'open')
+  .is('creator_id', null)
+
+if (updateError) {
+  alert('受注に失敗しました: ' + updateError.message)
+  return
+}
+
+await supabase.from('notifications').insert({
+  user_id: targetOrder.client_id,
+  type: 'order_matched',
+  title: '依頼が受注されました',
+  body: `「${targetOrder.title}」が受注されました。`,
+  link_url: `/request/${orderId}`,
+})
+
+alert('依頼を受注しました')
+router.push(`/request/${orderId}`)
+router.refresh()
+
       alert('依頼を受注しました')
       router.push(`/request/${orderId}`)
       router.refresh()
