@@ -4,6 +4,7 @@ import { createClient } from '../../lib/supabase/client'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import ProductMarketStatsCard from '../components/ProductMarketStatsCard'
 
 export default function ListingPage() {
   const [listings, setListings] = useState<any[]>([])
@@ -14,13 +15,24 @@ export default function ListingPage() {
   const [titleKeyword, setTitleKeyword] = useState('')
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
+  const [marketStats, setMarketStats] = useState<{
+    count: number
+    average: number
+    median: number
+    min: number
+    max: number
+  } | null>(null)
+  const [marketStatsLoading, setMarketStatsLoading] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
     const init = async () => {
       const supabase = createClient()
 
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
       if (user) {
         const { data: userProfile } = await supabase
           .from('users')
@@ -29,13 +41,13 @@ export default function ListingPage() {
           .single()
         setProfile(userProfile)
       }
-      
-const { data: cats } = await supabase
+
+      const { data: cats } = await supabase
         .from('categories')
         .select('*')
         .order('name')
       setCategories(cats || [])
-      
+
       const { data, error } = await supabase
         .from('product_listings')
         .select(`
@@ -51,10 +63,89 @@ const { data: cats } = await supabase
       } else {
         setListings(data || [])
       }
+
       setLoading(false)
     }
+
     init()
   }, [])
+
+  const getMedian = (numbers: number[]) => {
+    if (numbers.length === 0) return 0
+
+    const sorted = [...numbers].sort((a, b) => a - b)
+    const middle = Math.floor(sorted.length / 2)
+
+    if (sorted.length % 2 === 0) {
+      return (sorted[middle - 1] + sorted[middle]) / 2
+    }
+
+    return sorted[middle]
+  }
+
+  const loadMarketStats = async (categoryName: string) => {
+    if (!categoryName) {
+      setMarketStats(null)
+      return
+    }
+
+    const selectedCategory = categories.find((cat) => cat.name === categoryName)
+    if (!selectedCategory) {
+      setMarketStats(null)
+      return
+    }
+
+    setMarketStatsLoading(true)
+
+    try {
+      const supabase = createClient()
+
+      const since = new Date()
+      since.setDate(since.getDate() - 90)
+
+      const { data, error } = await supabase
+        .from('product_purchases')
+        .select('price, created_at')
+        .eq('category_id', selectedCategory.id)
+        .gte('created_at', since.toISOString())
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('market stats fetch error:', error)
+        setMarketStats(null)
+        return
+      }
+
+      const prices = (data || [])
+        .map((row: any) => Number(row.price || 0))
+        .filter((price) => Number.isFinite(price) && price > 0)
+
+      if (prices.length === 0) {
+        setMarketStats(null)
+        return
+      }
+
+      const count = prices.length
+      const average = prices.reduce((sum, price) => sum + price, 0) / count
+      const median = getMedian(prices)
+      const min = Math.min(...prices)
+      const max = Math.max(...prices)
+
+      setMarketStats({
+        count,
+        average,
+        median,
+        min,
+        max,
+      })
+    } finally {
+      setMarketStatsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadMarketStats(categoryKeyword)
+  }, [categoryKeyword, categories])
 
   const getCategoryName = (item: any) => {
     if (!item.categories) return '未分類'
@@ -71,14 +162,18 @@ const { data: cats } = await supabase
       const title = item.title || ''
       const price = item.price
 
-      const matchCategory = categoryKeyword.trim() === '' ||
-        catName === categoryKeyword
+      const matchCategory =
+        categoryKeyword.trim() === '' || catName === categoryKeyword
 
-      const matchTitle = titleKeyword.trim() === '' ||
+      const matchTitle =
+        titleKeyword.trim() === '' ||
         title.toLowerCase().includes(titleKeyword.toLowerCase())
 
-      const matchMin = parsedMin === null || (price !== null && Number(price) >= parsedMin)
-      const matchMax = parsedMax === null || (price !== null && Number(price) <= parsedMax)
+      const matchMin =
+        parsedMin === null || (price !== null && Number(price) >= parsedMin)
+
+      const matchMax =
+        parsedMax === null || (price !== null && Number(price) <= parsedMax)
 
       return matchCategory && matchTitle && matchMin && matchMax
     })
@@ -102,25 +197,37 @@ const { data: cats } = await supabase
           )}
         </div>
 
-        {/* 検索フィルター */}
+        <ProductMarketStatsCard
+          selectedCategoryName={categoryKeyword}
+          stats={marketStats}
+          loading={marketStatsLoading}
+        />
+
         <div className="bg-white rounded-3xl shadow-xl p-8 mb-8">
           <h2 className="text-lg font-bold mb-4">作品を検索</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">カテゴリ</label>
+              <label className="block text-sm font-medium text-gray-600 mb-2">
+                カテゴリ
+              </label>
               <select
                 value={categoryKeyword}
                 onChange={(e) => setCategoryKeyword(e.target.value)}
                 className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
               >
                 <option value="">すべての品目</option>
-                {categories.map(cat => (
-                  <option key={cat.id} value={cat.name}>{cat.name}</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.name}>
+                    {cat.name}
+                  </option>
                 ))}
               </select>
             </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">タイトル</label>
+              <label className="block text-sm font-medium text-gray-600 mb-2">
+                タイトル
+              </label>
               <input
                 type="text"
                 value={titleKeyword}
@@ -129,8 +236,11 @@ const { data: cats } = await supabase
                 className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
               />
             </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">最低価格</label>
+              <label className="block text-sm font-medium text-gray-600 mb-2">
+                最低価格
+              </label>
               <input
                 type="number"
                 min="0"
@@ -140,8 +250,11 @@ const { data: cats } = await supabase
                 className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
               />
             </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">最高価格</label>
+              <label className="block text-sm font-medium text-gray-600 mb-2">
+                最高価格
+              </label>
               <input
                 type="number"
                 min="0"
@@ -152,12 +265,12 @@ const { data: cats } = await supabase
               />
             </div>
           </div>
+
           <p className="text-sm text-gray-500 mt-3">
             {filteredListings.length} 件の作品が見つかりました
           </p>
         </div>
 
-        {/* 作品一覧 */}
         {loading ? (
           <div className="text-center py-12">読み込み中...</div>
         ) : filteredListings.length === 0 ? (
