@@ -166,25 +166,27 @@ export default function MyPage() {
   if (!user) return <div>ログインしてください</div>
 
   return (
-    <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-12">
-  <h1 className="text-4xl font-bold tracking-tight">マイページ</h1>
+    <div className="min-h-screen bg-gray-50 py-12">
+      <div className="max-w-4xl mx-auto px-4">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-12">
+          <h1 className="text-4xl font-bold tracking-tight">マイページ</h1>
 
-  <div className="flex flex-col sm:flex-row gap-3">
-    <Link
-      href="/listing/new"
-      className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-900 px-6 py-3.5 rounded-2xl font-medium shadow-sm transition text-center"
-    >
-      作品を出品する
-    </Link>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Link
+              href="/listing/new"
+              className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-900 px-6 py-3.5 rounded-2xl font-medium shadow-sm transition text-center"
+            >
+              作品を出品する
+            </Link>
 
-    <Link
-      href="/request/new"
-      className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3.5 rounded-2xl font-medium shadow-sm transition text-center"
-    >
-      新しい依頼を作成
-    </Link>
-  </div>
-</div>
+            <Link
+              href="/request/new"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3.5 rounded-2xl font-medium shadow-sm transition text-center"
+            >
+              新しい依頼を作成
+            </Link>
+          </div>
+        </div>
 
         <div className="bg-white rounded-3xl shadow-xl p-10 mb-12">
           <div className="flex items-center gap-8">
