@@ -9,6 +9,8 @@ export default function MyPage() {
   const [requests, setRequests] = useState<any[]>([])
   const [receivedOrders, setReceivedOrders] = useState<any[]>([])
   const [notifications, setNotifications] = useState<any[]>([])
+  const [productListings, setProductListings] = useState<any[]>([])
+  const [productPurchases, setProductPurchases] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [userCategoryNames, setUserCategoryNames] = useState<string[]>([])
 
@@ -84,6 +86,34 @@ export default function MyPage() {
           .limit(20)
 
         setNotifications(notificationRows || [])
+
+        const { data: myListings } = await supabase
+          .from('product_listings')
+          .select(`
+            *,
+            categories(name)
+          `)
+          .eq('seller_user_id', profile.id)
+          .order('created_at', { ascending: false })
+
+        setProductListings(myListings || [])
+
+        const { data: myPurchases } = await supabase
+          .from('product_purchases')
+          .select(`
+            *,
+            product_listings(
+              id,
+              title,
+              image_urls,
+              seller_user_id
+            ),
+            categories(name)
+          `)
+          .eq('buyer_user_id', profile.id)
+          .order('created_at', { ascending: false })
+
+        setProductPurchases(myPurchases || [])
       }
 
       setLoading(false)
@@ -101,6 +131,8 @@ export default function MyPage() {
     if (status === 'delivered') return '納品済み'
     if (status === 'completed') return '完了'
     if (status === 'cancelled') return 'キャンセル'
+    if (status === 'active') return '販売中'
+    if (status === 'sold') return '売約済み'
     return status
   }
 
@@ -111,6 +143,8 @@ export default function MyPage() {
     if (status === 'open') return 'bg-yellow-100 text-yellow-700'
     if (status === 'in_progress') return 'bg-indigo-100 text-indigo-700'
     if (status === 'revision') return 'bg-red-100 text-red-700'
+    if (status === 'active') return 'bg-blue-100 text-blue-700'
+    if (status === 'sold') return 'bg-gray-200 text-gray-700'
     return 'bg-gray-100 text-gray-600'
   }
 
@@ -120,6 +154,12 @@ export default function MyPage() {
       return skills.filter(Boolean).join(' / ') || '未設定'
     }
     return String(skills)
+  }
+
+  const getFirstImage = (imageUrls: any) => {
+    if (!imageUrls) return null
+    if (Array.isArray(imageUrls)) return imageUrls[0] || null
+    return null
   }
 
   if (loading) return <div className="p-12 text-center">読み込み中...</div>
@@ -194,10 +234,10 @@ export default function MyPage() {
             </Link>
 
             <Link
-              href="/market"
-              className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-5 rounded-2xl font-medium text-center hover:brightness-105 transition shadow-sm flex items-center justify-center gap-3"
+              href="/listing"
+              className="bg-gradient-to-r from-pink-600 to-purple-600 text-white py-5 rounded-2xl font-medium text-center hover:brightness-105 transition shadow-sm flex items-center justify-center gap-3"
             >
-              📈 相場ボードを見る
+              🛍 作品マーケットを見る
             </Link>
 
             <Link
@@ -301,7 +341,7 @@ export default function MyPage() {
           )}
         </div>
 
-        <div className="bg-white rounded-3xl shadow-xl p-10">
+        <div className="bg-white rounded-3xl shadow-xl p-10 mb-12">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-bold">あなたの受注一覧</h2>
             <span className="text-sm text-gray-500">{receivedOrders.length}件</span>
@@ -347,6 +387,167 @@ export default function MyPage() {
                   </div>
                 </Link>
               ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-3xl shadow-xl p-10 mb-12">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-2xl font-bold">あなたの出品一覧</h2>
+              <p className="text-sm text-gray-500 mt-2">作品マーケットに出品した既製品です</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-500">{productListings.length}件</span>
+              <Link
+                href="/listing/new"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-2xl font-medium transition"
+              >
+                作品を出品する
+              </Link>
+            </div>
+          </div>
+
+          {productListings.length === 0 ? (
+            <div className="text-center py-20 text-gray-500">
+              まだ出品した作品がありません
+              <br />
+              「作品を出品する」から既製品を登録できます
+            </div>
+          ) : (
+            <div className="grid gap-6">
+              {productListings.map((listing) => {
+                const imageUrl = getFirstImage(listing.image_urls)
+
+                return (
+                  <Link
+                    key={listing.id}
+                    href={`/listing/${listing.id}`}
+                    className="group border border-gray-200 hover:border-blue-300 hover:shadow-lg rounded-3xl overflow-hidden transition-all duration-300"
+                  >
+                    <div className="flex flex-col md:flex-row">
+                      <div className="w-full md:w-56 h-56 bg-gray-100 overflow-hidden shrink-0">
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt={listing.title}
+                            className="w-full h-full object-cover group-hover:scale-[1.02] transition"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+                            画像なし
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex-1 p-8 flex justify-between gap-6">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm text-gray-500 mb-2">
+                            {listing.categories?.name || '未分類'}
+                          </div>
+                          <div className="text-2xl font-semibold mb-3 group-hover:text-blue-600 transition-colors">
+                            {listing.title}
+                          </div>
+                          <div className="text-gray-600 line-clamp-3">
+                            {listing.description || '説明はありません'}
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <div
+                            className={`inline-block px-5 py-1.5 rounded-full text-sm font-medium ${getStatusClassName(listing.status)}`}
+                          >
+                            {getStatusLabel(listing.status)}
+                          </div>
+                          <div className="mt-4 text-3xl font-bold text-blue-600">
+                            ¥{Number(listing.price || 0).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-3xl shadow-xl p-10">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-2xl font-bold">あなたの購入履歴</h2>
+              <p className="text-sm text-gray-500 mt-2">作品マーケットで購入した既製品です</p>
+            </div>
+            <span className="text-sm text-gray-500">{productPurchases.length}件</span>
+          </div>
+
+          {productPurchases.length === 0 ? (
+            <div className="text-center py-20 text-gray-500">
+              まだ購入した作品がありません
+              <br />
+              作品マーケットから既製品を探してみましょう
+            </div>
+          ) : (
+            <div className="grid gap-6">
+              {productPurchases.map((purchase) => {
+                const listing = Array.isArray(purchase.product_listings)
+                  ? purchase.product_listings[0]
+                  : purchase.product_listings
+
+                const imageUrl = getFirstImage(listing?.image_urls)
+
+                return (
+                  <Link
+                    key={purchase.id}
+                    href={listing ? `/listing/${listing.id}` : '/listing'}
+                    className="group border border-gray-200 hover:border-blue-300 hover:shadow-lg rounded-3xl overflow-hidden transition-all duration-300"
+                  >
+                    <div className="flex flex-col md:flex-row">
+                      <div className="w-full md:w-56 h-56 bg-gray-100 overflow-hidden shrink-0">
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt={listing?.title || '購入作品'}
+                            className="w-full h-full object-cover group-hover:scale-[1.02] transition"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+                            画像なし
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex-1 p-8 flex justify-between gap-6">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm text-gray-500 mb-2">
+                            {purchase.categories?.name || '未分類'}
+                          </div>
+                          <div className="text-2xl font-semibold mb-3 group-hover:text-blue-600 transition-colors">
+                            {listing?.title || '作品タイトル不明'}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            購入日：
+                            {purchase.created_at
+                              ? new Date(purchase.created_at).toLocaleString('ja-JP')
+                              : '不明'}
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <div
+                            className={`inline-block px-5 py-1.5 rounded-full text-sm font-medium ${getStatusClassName(purchase.status || 'completed')}`}
+                          >
+                            {getStatusLabel(purchase.status || 'completed')}
+                          </div>
+                          <div className="mt-4 text-3xl font-bold text-blue-600">
+                            ¥{Number(purchase.price || 0).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                )
+              })}
             </div>
           )}
         </div>
