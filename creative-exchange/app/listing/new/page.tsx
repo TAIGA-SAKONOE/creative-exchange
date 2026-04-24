@@ -163,7 +163,7 @@ export default function NewListing() {
 
             <button
               onClick={handleSubmit}
-              disabled={submitting || !title.trim() || !price || !categoryId}
+              disabled={submitting}
               className={`w-full py-4 rounded-xl font-medium text-lg text-white ${
                 submitting ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
               }`}
