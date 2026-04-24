@@ -513,6 +513,7 @@ export default function ExchangePage() {
                       <option key={cat.id} value={cat.name}>{cat.name}</option>
                     ))}
                   </select>
+                   </div> 
 
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-2">
