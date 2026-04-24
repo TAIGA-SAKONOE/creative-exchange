@@ -40,11 +40,10 @@ export default function NewListing() {
   }, [router])
 
   const handleSubmit = async () => {
-    if (!profile || !title.trim() || !price || !categoryId) {
-      alert('タイトル、品目、価格は必須です')
+if (!profile || !title.trim() || !price) {
+      alert('タイトルと価格は必須です')
       return
     }
-
     setSubmitting(true)
     const supabase = createClient()
 
@@ -72,7 +71,7 @@ export default function NewListing() {
           title: title.trim(),
           description: description.trim(),
           price: parseInt(price),
-          category_id: parseInt(categoryId),
+          category_id: Number(categoryId) || 1,
           image_urls: imageUrls,
           status: 'active'
         })
