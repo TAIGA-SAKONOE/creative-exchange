@@ -19,31 +19,41 @@ export default function NewListing() {
   useEffect(() => {
     const init = async () => {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        router.push('/login')
+        return
+      }
 
       const { data: userProfile } = await supabase
         .from('users')
         .select('id')
         .eq('auth_id', user.id)
         .single()
+
       setProfile(userProfile)
 
       const { data: cats } = await supabase
         .from('categories')
         .select('*')
         .order('name')
+
       setCategories(cats || [])
       setLoading(false)
     }
+
     init()
   }, [router])
 
   const handleSubmit = async () => {
-if (!profile || !title.trim() || !price) {
-      alert('タイトルと価格は必須です')
+    if (!profile || !title.trim() || !price || !categoryId) {
+      alert('タイトル・品目・価格は必須です')
       return
     }
+
     setSubmitting(true)
     const supabase = createClient()
 
@@ -52,15 +62,17 @@ if (!profile || !title.trim() || !price) {
 
       if (imageFile) {
         const filePath = `listings/${profile.id}/${Date.now()}_${imageFile.name}`
+
         const { error: uploadError } = await supabase.storage
           .from('listing-images')
           .upload(filePath, imageFile)
 
         if (uploadError) throw uploadError
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('listing-images')
-          .getPublicUrl(filePath)
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from('listing-images').getPublicUrl(filePath)
+
         imageUrls = [publicUrl]
       }
 
@@ -70,10 +82,10 @@ if (!profile || !title.trim() || !price) {
           seller_user_id: profile.id,
           title: title.trim(),
           description: description.trim(),
-          price: parseInt(price),
-          category_id: Number(categoryId) || 1,
+          price: parseInt(price, 10),
+          category_id: Number(categoryId),
           image_urls: imageUrls,
-          status: 'active'
+          status: 'active',
         })
 
       if (insertError) throw insertError
@@ -89,13 +101,13 @@ if (!profile || !title.trim() || !price) {
 
   if (loading) return <div className="p-12 text-center">読み込み中...</div>
 
-  
-  
-
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-2xl mx-auto px-4">
-        <button onClick={() => router.push('/listing')} className="mb-6 text-gray-500 hover:text-gray-700">
+        <button
+          onClick={() => router.push('/listing')}
+          className="mb-6 text-gray-500 hover:text-gray-700"
+        >
           ← 作品一覧に戻る
         </button>
 
@@ -104,7 +116,9 @@ if (!profile || !title.trim() || !price) {
 
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">タイトル *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                タイトル *
+              </label>
               <input
                 type="text"
                 value={title}
@@ -115,20 +129,31 @@ if (!profile || !title.trim() || !price) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">品目 *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                品目 *
+              </label>
               <select
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
                 className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200"
+                required
               >
-                {categories.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                <option value="">品目を選択してください</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
                 ))}
               </select>
+              <p className="mt-2 text-sm text-gray-500">
+                依頼機能や相場ボードと同じ品目体系で管理されます。
+              </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">価格（円） *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                価格（円） *
+              </label>
               <input
                 type="number"
                 value={price}
@@ -140,7 +165,9 @@ if (!profile || !title.trim() || !price) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">説明</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                説明
+              </label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -151,7 +178,9 @@ if (!profile || !title.trim() || !price) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">サムネイル画像</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                サムネイル画像
+              </label>
               <input
                 type="file"
                 accept="image/*"
