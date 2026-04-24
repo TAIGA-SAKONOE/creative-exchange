@@ -32,7 +32,7 @@ export default function NewListing() {
       const { data: cats } = await supabase
         .from('categories')
         .select('*')
-        .order('sort_order')
+        .order('name')
       setCategories(cats || [])
       setLoading(false)
     }
