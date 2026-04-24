@@ -65,7 +65,7 @@ export default function ListingPage() {
       const price = item.price
 
       const matchCategory = categoryKeyword.trim() === '' ||
-        catName.toLowerCase().includes(categoryKeyword.toLowerCase())
+        catName === categoryKeyword
 
       const matchTitle = titleKeyword.trim() === '' ||
         title.toLowerCase().includes(titleKeyword.toLowerCase())
@@ -101,13 +101,16 @@ export default function ListingPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-2">カテゴリ</label>
-              <input
-                type="text"
+              <select
                 value={categoryKeyword}
                 onChange={(e) => setCategoryKeyword(e.target.value)}
-                placeholder="例: イラスト"
                 className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
-              />
+              >
+                <option value="">すべての品目</option>
+                {Array.from(new Set(listings.map(item => getCategoryName(item)))).sort().map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-2">タイトル</label>
