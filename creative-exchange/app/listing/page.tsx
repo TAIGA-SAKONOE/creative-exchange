@@ -7,6 +7,7 @@ import Link from 'next/link'
 
 export default function ListingPage() {
   const [listings, setListings] = useState<any[]>([])
+  const [categories, setCategories] = useState<any[]>([])
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [categoryKeyword, setCategoryKeyword] = useState('')
@@ -28,7 +29,13 @@ export default function ListingPage() {
           .single()
         setProfile(userProfile)
       }
-
+      
+const { data: cats } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name')
+      setCategories(cats || [])
+      
       const { data, error } = await supabase
         .from('product_listings')
         .select(`
@@ -107,8 +114,8 @@ export default function ListingPage() {
                 className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
               >
                 <option value="">すべての品目</option>
-                {Array.from(new Set(listings.map(item => getCategoryName(item)))).sort().map(name => (
-                  <option key={name} value={name}>{name}</option>
+                {categories.map(cat => (
+                  <option key={cat.id} value={cat.name}>{cat.name}</option>
                 ))}
               </select>
             </div>
