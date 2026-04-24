@@ -122,28 +122,7 @@ export default function RequestDetail() {
       if (messagesError) {
         console.error('order_messages取得エラー', messagesError)
       } else {
-        const senderIds = [...new Set((messageRows ?? []).map((msg: any) => msg.sender_user_id))]
-        let senderMap: Record<string, string> = {}
-
-        if (senderIds.length > 0) {
-          const { data: senderProfiles } = await supabase
-            .from('users')
-            .select('id, display_name')
-            .in('id', senderIds)
-
-          senderMap =
-            (senderProfiles ?? []).reduce((acc: Record<string, string>, item: any) => {
-              acc[item.id] = item.display_name || '不明なユーザー'
-              return acc
-            }, {}) || {}
-        }
-
-        const enrichedMessages = (messageRows ?? []).map((msg: any) => ({
-          ...msg,
-          sender_name: senderMap[msg.sender_user_id] || '不明なユーザー',
-        }))
-
-        setMessages(enrichedMessages)
+        setMessages(messageRows ?? [])
       }
     } catch (err: any) {
       setError(err.message || 'データの読み込み中にエラーが発生しました')
@@ -283,6 +262,7 @@ export default function RequestDetail() {
         .insert({
           order_id: id,
           sender_user_id: profile.id,
+          sender_display_name: profile.display_name || '不明なユーザー',
           message: messageText.trim(),
         })
 
@@ -625,7 +605,7 @@ export default function RequestDetail() {
                         >
                           <div className="flex items-center justify-between gap-4 mb-2">
                             <p className="text-sm font-medium text-gray-700">
-                              {msg.sender_name}
+                              {msg.sender_display_name || '不明なユーザー'}
                             </p>
                             <p className="text-xs text-gray-500 whitespace-nowrap">
                               {msg.created_at
