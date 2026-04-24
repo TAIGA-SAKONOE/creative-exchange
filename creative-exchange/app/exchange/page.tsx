@@ -309,11 +309,9 @@ export default function ExchangePage() {
 
   const getCategoryName = (target: { categories?: CategoryValue }) => {
     if (!target.categories) return '未分類'
-
     if (Array.isArray(target.categories)) {
       return target.categories[0]?.name || '未分類'
     }
-
     return target.categories.name || '未分類'
   }
 
@@ -601,33 +599,13 @@ export default function ExchangePage() {
         return
       }
 
-      const { error: updateError } = await supabase
-  .from('orders')
-  .update({
-    creator_id: currentUser.id,
-    status: 'matched',
-    updated_at: new Date().toISOString(),
-  })
-  .eq('id', orderId)
-  .eq('status', 'open')
-  .is('creator_id', null)
-
-if (updateError) {
-  alert('受注に失敗しました: ' + updateError.message)
-  return
-}
-
-await supabase.from('notifications').insert({
-  user_id: targetOrder.client_id,
-  type: 'order_matched',
-  title: '依頼が受注されました',
-  body: `「${targetOrder.title}」が受注されました。`,
-  link_url: `/request/${orderId}`,
-})
-
-alert('依頼を受注しました')
-router.push(`/request/${orderId}`)
-router.refresh()
+      await supabase.from('notifications').insert({
+        user_id: targetOrder.client_id,
+        type: 'order_matched',
+        title: '依頼が受注されました',
+        body: `「${targetOrder.title}」が受注されました。`,
+        link_url: `/request/${orderId}`,
+      })
 
       alert('依頼を受注しました')
       router.push(`/request/${orderId}`)
@@ -675,13 +653,14 @@ router.refresh()
           listing_id: targetListing.id,
           buyer_user_id: currentUser.id,
           price: targetListing.price,
-          category_id: categoryOptions.find((cat) => cat.name === getCategoryName(targetListing))?.id || null,
+          category_id:
+            categoryOptions.find((cat) => cat.name === getCategoryName(targetListing))?.id || null,
           status: 'completed',
         })
 
       if (purchaseError) throw purchaseError
 
-      const { error: updateError } = await supabase
+      const { error: listingUpdateError } = await supabase
         .from('product_listings')
         .update({
           status: 'sold',
@@ -689,7 +668,7 @@ router.refresh()
         .eq('id', listingId)
         .eq('status', 'active')
 
-      if (updateError) throw updateError
+      if (listingUpdateError) throw listingUpdateError
 
       await supabase.from('notifications').insert({
         user_id: targetListing.seller_user_id,
@@ -908,7 +887,9 @@ router.refresh()
                               {getCategoryName(order)}
                             </span>
 
-                            <span className={`inline-flex px-4 py-1.5 rounded-full text-sm font-medium ${statusChip.className}`}>
+                            <span
+                              className={`inline-flex px-4 py-1.5 rounded-full text-sm font-medium ${statusChip.className}`}
+                            >
                               {statusChip.label}
                             </span>
                           </div>
