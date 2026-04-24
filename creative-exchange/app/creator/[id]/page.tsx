@@ -12,6 +12,8 @@ type ProductSalesSummary = {
   sales_count: number
   average_price: number
   median_price: number
+  p25_price: number
+  p75_price: number
   min_price: number
   max_price: number
 }
@@ -121,6 +123,22 @@ export default function CreatorProfile() {
           return sorted[middle]
         }
 
+        const getPercentile = (numbers: number[], percentile: number) => {
+          if (numbers.length === 0) return 0
+          const sorted = [...numbers].sort((a, b) => a - b)
+
+          if (sorted.length === 1) return sorted[0]
+
+          const index = (sorted.length - 1) * percentile
+          const lower = Math.floor(index)
+          const upper = Math.ceil(index)
+
+          if (lower === upper) return sorted[lower]
+
+          const weight = index - lower
+          return sorted[lower] * (1 - weight) + sorted[upper] * weight
+        }
+
         const salesSummary: ProductSalesSummary[] = Array.from(grouped.values())
           .filter((group) => group.prices.length > 0)
           .map((group) => {
@@ -129,6 +147,8 @@ export default function CreatorProfile() {
             const averagePrice =
               prices.reduce((sum, value) => sum + value, 0) / salesCount
             const medianPrice = getMedian(prices)
+            const p25Price = getPercentile(prices, 0.25)
+            const p75Price = getPercentile(prices, 0.75)
             const minPrice = Math.min(...prices)
             const maxPrice = Math.max(...prices)
 
@@ -138,6 +158,8 @@ export default function CreatorProfile() {
               sales_count: salesCount,
               average_price: averagePrice,
               median_price: medianPrice,
+              p25_price: p25Price,
+              p75_price: p75Price,
               min_price: minPrice,
               max_price: maxPrice,
             }
@@ -299,11 +321,20 @@ export default function CreatorProfile() {
                           </span>
                         </div>
                         <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">
+                            価格帯（25〜75パーセンタイル）
+                          </span>
+                          <span>
+                            ¥{Math.round(item.p25_price).toLocaleString()} 〜
+                            ¥{Math.round(item.p75_price).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
                           <span className="text-gray-500">平均価格</span>
                           <span>¥{Math.round(item.average_price).toLocaleString()}</span>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-500">価格帯</span>
+                        <div className="flex justify-between text-xs text-gray-500">
+                          <span>最安〜最高</span>
                           <span>
                             ¥{Math.round(item.min_price).toLocaleString()} 〜
                             ¥{Math.round(item.max_price).toLocaleString()}
