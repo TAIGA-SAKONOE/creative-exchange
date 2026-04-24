@@ -4,6 +4,7 @@ import { createClient } from '../../lib/supabase/client'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import ProductMarketStatsCard from '../components/ProductMarketStatsCard'
 
 type UserProfile = {
   id: string
@@ -103,6 +104,15 @@ export default function ExchangePage() {
   const [listingTitleKeyword, setListingTitleKeyword] = useState('')
   const [listingMinPrice, setListingMinPrice] = useState('')
   const [listingMaxPrice, setListingMaxPrice] = useState('')
+
+  const [listingMarketStats, setListingMarketStats] = useState<{
+    count: number
+    average: number
+    median: number
+    min: number
+    max: number
+  } | null>(null)
+  const [listingMarketStatsLoading, setListingMarketStatsLoading] = useState(false)
 
   useEffect(() => {
     const loadExchangePage = async () => {
@@ -366,6 +376,77 @@ export default function ExchangePage() {
     return imageUrls[0]
   }
 
+  const getMedian = (numbers: number[]) => {
+    if (numbers.length === 0) return 0
+
+    const sorted = [...numbers].sort((a, b) => a - b)
+    const middle = Math.floor(sorted.length / 2)
+
+    if (sorted.length % 2 === 0) {
+      return (sorted[middle - 1] + sorted[middle]) / 2
+    }
+
+    return sorted[middle]
+  }
+
+  const loadListingMarketStats = async (categoryId: string) => {
+    if (!categoryId) {
+      setListingMarketStats(null)
+      return
+    }
+
+    setListingMarketStatsLoading(true)
+
+    try {
+      const supabase = createClient()
+
+      const since = new Date()
+      since.setDate(since.getDate() - 90)
+
+      const { data, error } = await supabase
+        .from('product_purchases')
+        .select('price, created_at')
+        .eq('category_id', Number(categoryId))
+        .gte('created_at', since.toISOString())
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('作品相場取得エラー', error)
+        setListingMarketStats(null)
+        return
+      }
+
+      const prices = (data || [])
+        .map((row: any) => Number(row.price || 0))
+        .filter((price) => Number.isFinite(price) && price > 0)
+
+      if (prices.length === 0) {
+        setListingMarketStats(null)
+        return
+      }
+
+      const count = prices.length
+      const average = prices.reduce((sum, price) => sum + price, 0) / count
+      const median = getMedian(prices)
+      const min = Math.min(...prices)
+      const max = Math.max(...prices)
+
+      setListingMarketStats({
+        count,
+        average,
+        median,
+        min,
+        max,
+      })
+    } finally {
+      setListingMarketStatsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadListingMarketStats(listingCategoryId)
+  }, [listingCategoryId])
+
   const filteredOrders = useMemo(() => {
     const parsedMinBudget = minBudget.trim() === '' ? null : Number(minBudget)
     const parsedMaxBudget = maxBudget.trim() === '' ? null : Number(maxBudget)
@@ -473,6 +554,9 @@ export default function ExchangePage() {
       return categoryMatch && titleMatch && minPriceMatch && maxPriceMatch
     })
   }, [listings, listingCategoryId, listingTitleKeyword, listingMinPrice, listingMaxPrice, categoryOptions])
+
+  const selectedListingCategoryName =
+    categoryOptions.find((cat) => cat.id === Number(listingCategoryId))?.name || ''
 
   const handleAccept = async (orderId: string) => {
     if (!currentUser?.id) {
@@ -1142,6 +1226,12 @@ export default function ExchangePage() {
           </>
         ) : (
           <>
+            <ProductMarketStatsCard
+              selectedCategoryName={selectedListingCategoryName}
+              stats={listingMarketStats}
+              loading={listingMarketStatsLoading}
+            />
+
             <div className="bg-white rounded-3xl shadow-xl p-8 mb-8">
               <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
                 <div>
