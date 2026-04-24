@@ -290,7 +290,7 @@ export default function ExchangePage() {
 
       const matchCategory =
         categoryKeyword.trim() === '' ||
-        categoryName.toLowerCase().includes(categoryKeyword.toLowerCase())
+        categoryName === categoryKeyword
 
       const matchTitle =
         titleKeyword.trim() === '' ||
@@ -503,14 +503,16 @@ export default function ExchangePage() {
                   <label className="block text-sm font-medium text-gray-600 mb-2">
                     カテゴリ
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={categoryKeyword}
                     onChange={(e) => setCategoryKeyword(e.target.value)}
-                    placeholder="例: イラスト"
                     className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
-                  />
-                </div>
+                  >
+                    <option value="">すべての品目</option>
+                    {categoryOptions.map(cat => (
+                      <option key={cat.id} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-2">
