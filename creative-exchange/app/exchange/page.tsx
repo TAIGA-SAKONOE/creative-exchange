@@ -89,7 +89,7 @@ export default function ExchangePage() {
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null)
   const [buyingListingId, setBuyingListingId] = useState<string | null>(null)
 
-  const [categoryKeyword, setCategoryKeyword] = useState('')
+  const [requestCategoryId, setRequestCategoryId] = useState('')
   const [titleKeyword, setTitleKeyword] = useState('')
   const [descriptionKeyword, setDescriptionKeyword] = useState('')
   const [minBudget, setMinBudget] = useState('')
@@ -456,8 +456,8 @@ export default function ExchangePage() {
       const price = order.agreed_price
 
       const matchCategory =
-        categoryKeyword.trim() === '' ||
-        categoryName.toLowerCase().includes(categoryKeyword.toLowerCase())
+        requestCategoryId === '' ||
+        categoryOptions.find((cat) => cat.id === Number(requestCategoryId))?.name === categoryName
 
       const matchTitle =
         titleKeyword.trim() === '' ||
@@ -489,7 +489,7 @@ export default function ExchangePage() {
         matchMaxBudget
       )
     })
-  }, [orders, categoryKeyword, titleKeyword, descriptionKeyword, minBudget, maxBudget])
+  }, [orders, requestCategoryId, titleKeyword, descriptionKeyword, minBudget, maxBudget, categoryOptions])
 
   const filteredCreators = useMemo(() => {
     return creators.filter((creator) => {
@@ -792,13 +792,18 @@ export default function ExchangePage() {
                   <label className="block text-sm font-medium text-gray-600 mb-2">
                     カテゴリ
                   </label>
-                  <input
-                    type="text"
-                    value={categoryKeyword}
-                    onChange={(e) => setCategoryKeyword(e.target.value)}
-                    placeholder="例: イラスト"
-                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
-                  />
+                  <select
+                    value={requestCategoryId}
+                    onChange={(e) => setRequestCategoryId(e.target.value)}
+                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+                  >
+                    <option value="">すべて</option>
+                    {categoryOptions.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
