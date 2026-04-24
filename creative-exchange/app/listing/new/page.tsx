@@ -53,13 +53,13 @@ if (!profile || !title.trim() || !price) {
       if (imageFile) {
         const filePath = `listings/${profile.id}/${Date.now()}_${imageFile.name}`
         const { error: uploadError } = await supabase.storage
-          .from('deliverables')
+          .from('listing-images')
           .upload(filePath, imageFile)
 
         if (uploadError) throw uploadError
 
         const { data: { publicUrl } } = supabase.storage
-          .from('deliverables')
+          .from('listing-images')
           .getPublicUrl(filePath)
         imageUrls = [publicUrl]
       }
