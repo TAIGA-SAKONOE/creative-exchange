@@ -38,6 +38,18 @@ type CreatorItem = {
   portfolio_urls: string[] | string | null
 }
 
+type ListingItem = {
+  id: string
+  seller_user_id: string
+  title: string
+  description: string | null
+  price: number
+  image_urls: string[] | null
+  status: string
+  created_at: string
+  categories?: CategoryValue
+}
+
 type CategoryOption = {
   id: number
   name: string
@@ -51,6 +63,14 @@ type CreatorCategoryMap = Record<
   }
 >
 
+type SellerMap = Record<
+  string,
+  {
+    display_name: string | null
+    twitter_handle: string | null
+  }
+>
+
 export default function ExchangePage() {
   const router = useRouter()
 
@@ -60,10 +80,13 @@ export default function ExchangePage() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null)
   const [orders, setOrders] = useState<OrderItem[]>([])
   const [creators, setCreators] = useState<CreatorItem[]>([])
+  const [listings, setListings] = useState<ListingItem[]>([])
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([])
   const [creatorCategoryMap, setCreatorCategoryMap] = useState<CreatorCategoryMap>({})
-  const [activeTab, setActiveTab] = useState<'requests' | 'creators'>('requests')
+  const [sellerMap, setSellerMap] = useState<SellerMap>({})
+  const [activeTab, setActiveTab] = useState<'requests' | 'creators' | 'listings'>('requests')
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null)
+  const [buyingListingId, setBuyingListingId] = useState<string | null>(null)
 
   const [categoryKeyword, setCategoryKeyword] = useState('')
   const [titleKeyword, setTitleKeyword] = useState('')
@@ -75,6 +98,11 @@ export default function ExchangePage() {
   const [creatorNameKeyword, setCreatorNameKeyword] = useState('')
   const [creatorBioKeyword, setCreatorBioKeyword] = useState('')
   const [creatorSkillKeyword, setCreatorSkillKeyword] = useState('')
+
+  const [listingCategoryId, setListingCategoryId] = useState('')
+  const [listingTitleKeyword, setListingTitleKeyword] = useState('')
+  const [listingMinPrice, setListingMinPrice] = useState('')
+  const [listingMaxPrice, setListingMaxPrice] = useState('')
 
   useEffect(() => {
     const loadExchangePage = async () => {
@@ -210,6 +238,55 @@ export default function ExchangePage() {
         })
 
         setCreatorCategoryMap(nextMap)
+
+        const { data: listingRows, error: listingsError } = await supabase
+          .from('product_listings')
+          .select(`
+            id,
+            seller_user_id,
+            title,
+            description,
+            price,
+            image_urls,
+            status,
+            created_at,
+            categories(name)
+          `)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+
+        if (listingsError) {
+          setError(listingsError.message || '作品一覧の取得に失敗しました')
+          setLoading(false)
+          return
+        }
+
+        const activeListings = (listingRows ?? []) as unknown as ListingItem[]
+        setListings(activeListings)
+
+        const sellerIds = [...new Set(activeListings.map((listing) => listing.seller_user_id).filter(Boolean))]
+
+        if (sellerIds.length > 0) {
+          const { data: sellerRows, error: sellersError } = await supabase
+            .from('users')
+            .select('id, display_name, twitter_handle')
+            .in('id', sellerIds)
+
+          if (sellersError) {
+            setError(sellersError.message || '出品者情報の取得に失敗しました')
+            setLoading(false)
+            return
+          }
+
+          const nextSellerMap: SellerMap = {}
+          ;(sellerRows || []).forEach((seller: any) => {
+            nextSellerMap[seller.id] = {
+              display_name: seller.display_name || null,
+              twitter_handle: seller.twitter_handle || null,
+            }
+          })
+          setSellerMap(nextSellerMap)
+        }
       } catch (err: any) {
         setError(err?.message || '読み込み中にエラーが発生しました')
       } finally {
@@ -220,14 +297,14 @@ export default function ExchangePage() {
     loadExchangePage()
   }, [])
 
-  const getCategoryName = (order: OrderItem) => {
-    if (!order.categories) return '未分類'
+  const getCategoryName = (target: { categories?: CategoryValue }) => {
+    if (!target.categories) return '未分類'
 
-    if (Array.isArray(order.categories)) {
-      return order.categories[0]?.name || '未分類'
+    if (Array.isArray(target.categories)) {
+      return target.categories[0]?.name || '未分類'
     }
 
-    return order.categories.name || '未分類'
+    return target.categories.name || '未分類'
   }
 
   const getSkillText = (
@@ -256,6 +333,12 @@ export default function ExchangePage() {
     return `${description.slice(0, 120)}...`
   }
 
+  const getListingDescription = (description: string | null) => {
+    if (!description) return '説明はありません'
+    if (description.length <= 100) return description
+    return `${description.slice(0, 100)}...`
+  }
+
   const getOrderStatusChip = (order: OrderItem) => {
     if (order.creator_id) {
       return {
@@ -278,6 +361,11 @@ export default function ExchangePage() {
     return creatorCategoryMap[userId]?.ids || []
   }
 
+  const getListingImage = (imageUrls: string[] | null) => {
+    if (!imageUrls || imageUrls.length === 0) return null
+    return imageUrls[0]
+  }
+
   const filteredOrders = useMemo(() => {
     const parsedMinBudget = minBudget.trim() === '' ? null : Number(minBudget)
     const parsedMaxBudget = maxBudget.trim() === '' ? null : Number(maxBudget)
@@ -290,7 +378,7 @@ export default function ExchangePage() {
 
       const matchCategory =
         categoryKeyword.trim() === '' ||
-        categoryName === categoryKeyword
+        categoryName.toLowerCase().includes(categoryKeyword.toLowerCase())
 
       const matchTitle =
         titleKeyword.trim() === '' ||
@@ -357,6 +445,35 @@ export default function ExchangePage() {
     creatorSkillKeyword,
   ])
 
+  const filteredListings = useMemo(() => {
+    const parsedMinPrice = listingMinPrice.trim() === '' ? null : Number(listingMinPrice)
+    const parsedMaxPrice = listingMaxPrice.trim() === '' ? null : Number(listingMaxPrice)
+
+    return listings.filter((listing) => {
+      const categoryName = getCategoryName(listing)
+      const title = listing.title || ''
+      const price = Number(listing.price || 0)
+
+      const categoryMatch =
+        listingCategoryId === '' ||
+        categoryOptions.find((cat) => cat.id === Number(listingCategoryId))?.name === categoryName
+
+      const titleMatch =
+        listingTitleKeyword.trim() === '' ||
+        title.toLowerCase().includes(listingTitleKeyword.toLowerCase())
+
+      const minPriceMatch =
+        parsedMinPrice === null ||
+        (!Number.isNaN(parsedMinPrice) && price >= parsedMinPrice)
+
+      const maxPriceMatch =
+        parsedMaxPrice === null ||
+        (!Number.isNaN(parsedMaxPrice) && price <= parsedMaxPrice)
+
+      return categoryMatch && titleMatch && minPriceMatch && maxPriceMatch
+    })
+  }, [listings, listingCategoryId, listingTitleKeyword, listingMinPrice, listingMaxPrice, categoryOptions])
+
   const handleAccept = async (orderId: string) => {
     if (!currentUser?.id) {
       window.location.href = '/login'
@@ -410,6 +527,76 @@ export default function ExchangePage() {
     }
   }
 
+  const handleBuyListing = async (listingId: string) => {
+    if (!currentUser?.id) {
+      window.location.href = '/login'
+      return
+    }
+
+    const targetListing = listings.find((listing) => listing.id === listingId)
+    if (!targetListing) {
+      alert('対象の作品が見つかりませんでした')
+      return
+    }
+
+    if (targetListing.seller_user_id === currentUser.id) {
+      alert('自分の作品は購入できません')
+      return
+    }
+
+    if (targetListing.status !== 'active') {
+      alert('この作品は現在購入できません')
+      return
+    }
+
+    const confirmed = window.confirm(`「${targetListing.title}」を購入しますか？`)
+    if (!confirmed) return
+
+    setBuyingListingId(listingId)
+
+    try {
+      const supabase = createClient()
+
+      const { error: purchaseError } = await supabase
+        .from('product_purchases')
+        .insert({
+          listing_id: targetListing.id,
+          buyer_user_id: currentUser.id,
+          price: targetListing.price,
+          category_id: categoryOptions.find((cat) => cat.name === getCategoryName(targetListing))?.id || null,
+          status: 'completed',
+        })
+
+      if (purchaseError) throw purchaseError
+
+      const { error: updateError } = await supabase
+        .from('product_listings')
+        .update({
+          status: 'sold',
+        })
+        .eq('id', listingId)
+        .eq('status', 'active')
+
+      if (updateError) throw updateError
+
+      await supabase.from('notifications').insert({
+        user_id: targetListing.seller_user_id,
+        type: 'listing_purchased',
+        title: '作品が購入されました',
+        body: `「${targetListing.title}」が購入されました。`,
+        link_url: `/listing/${listingId}`,
+      })
+
+      alert('作品を購入しました')
+      router.push(`/listing/${listingId}`)
+      router.refresh()
+    } catch (err: any) {
+      alert(err?.message || '購入処理中にエラーが発生しました')
+    } finally {
+      setBuyingListingId(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 py-12">
@@ -445,7 +632,7 @@ export default function ExchangePage() {
             </div>
             <h1 className="text-4xl md:text-5xl font-bold tracking-tight">案件を探す</h1>
             <p className="mt-3 text-gray-600 text-lg">
-              公開依頼から受注先を探し、価格表やプロフィールも確認できます
+              公開依頼・クリエイター・既製品を横断して探せます
             </p>
           </div>
 
@@ -458,7 +645,7 @@ export default function ExchangePage() {
         </div>
 
         <div className="bg-white rounded-3xl shadow-xl p-3 mb-8">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <button
               onClick={() => setActiveTab('requests')}
               className={`px-5 py-3 rounded-2xl font-medium transition ${
@@ -479,6 +666,17 @@ export default function ExchangePage() {
               }`}
             >
               クリエイター一覧
+            </button>
+
+            <button
+              onClick={() => setActiveTab('listings')}
+              className={`px-5 py-3 rounded-2xl font-medium transition ${
+                activeTab === 'listings'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              作品マーケット
             </button>
           </div>
         </div>
@@ -503,17 +701,14 @@ export default function ExchangePage() {
                   <label className="block text-sm font-medium text-gray-600 mb-2">
                     カテゴリ
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={categoryKeyword}
                     onChange={(e) => setCategoryKeyword(e.target.value)}
+                    placeholder="例: イラスト"
                     className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
-                  >
-                    <option value="">すべての品目</option>
-                    {categoryOptions.map(cat => (
-                      <option key={cat.id} value={cat.name}>{cat.name}</option>
-                    ))}
-                  </select>
-                   </div> 
+                  />
+                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-2">
@@ -668,7 +863,7 @@ export default function ExchangePage() {
               </div>
             )}
           </>
-        ) : (
+        ) : activeTab === 'creators' ? (
           <>
             {currentUser && (
               <div className="bg-white rounded-3xl shadow-xl p-8 mb-8 border border-blue-100">
@@ -937,6 +1132,181 @@ export default function ExchangePage() {
                               </div>
                             )}
                           </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="bg-white rounded-3xl shadow-xl p-8 mb-8">
+              <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold">作品を検索</h2>
+                  <p className="text-sm text-gray-500 mt-2">
+                    既製品をカテゴリ・タイトル・価格帯から探せます
+                  </p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-gray-500">
+                    表示中 {filteredListings.length} 件
+                  </span>
+                  <Link
+                    href="/listing/new"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-2xl font-medium transition"
+                  >
+                    作品を出品する
+                  </Link>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                    カテゴリ
+                  </label>
+                  <select
+                    value={listingCategoryId}
+                    onChange={(e) => setListingCategoryId(e.target.value)}
+                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+                  >
+                    <option value="">すべての品目</option>
+                    {categoryOptions.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                    タイトル
+                  </label>
+                  <input
+                    type="text"
+                    value={listingTitleKeyword}
+                    onChange={(e) => setListingTitleKeyword(e.target.value)}
+                    placeholder="例: オリジナル曲"
+                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                    最低価格
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={listingMinPrice}
+                    onChange={(e) => setListingMinPrice(e.target.value)}
+                    placeholder="例: 1000"
+                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                    最高価格
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={listingMaxPrice}
+                    onChange={(e) => setListingMaxPrice(e.target.value)}
+                    placeholder="例: 50000"
+                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {filteredListings.length === 0 ? (
+              <div className="bg-white rounded-3xl shadow-xl p-14 text-center">
+                <div className="text-5xl mb-4">🛍</div>
+                <h3 className="text-xl font-bold mb-2">条件に合う作品がありません</h3>
+                <p className="text-gray-500">
+                  検索条件を変えると、表示される場合があります
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {filteredListings.map((listing) => {
+                  const isOwnListing = currentUser?.id === listing.seller_user_id
+                  const imageUrl = getListingImage(listing.image_urls)
+                  const seller = sellerMap[listing.seller_user_id]
+
+                  return (
+                    <div
+                      key={listing.id}
+                      className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden hover:shadow-2xl transition-shadow"
+                    >
+                      <Link href={`/listing/${listing.id}`} className="block">
+                        <div className="w-full aspect-[4/3] bg-gray-100 overflow-hidden">
+                          {imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={listing.title}
+                              className="w-full h-full object-cover hover:scale-[1.02] transition"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+                              画像なし
+                            </div>
+                          )}
+                        </div>
+                      </Link>
+
+                      <div className="p-6">
+                        <div className="text-sm text-gray-500 mb-2">
+                          {getCategoryName(listing)}
+                        </div>
+
+                        <Link href={`/listing/${listing.id}`} className="block">
+                          <h3 className="text-2xl font-bold mb-3 hover:text-blue-600 transition">
+                            {listing.title}
+                          </h3>
+                        </Link>
+
+                        <p className="text-gray-600 text-sm leading-7 mb-4">
+                          {getListingDescription(listing.description)}
+                        </p>
+
+                        <div className="text-sm text-gray-500 mb-4">
+                          出品者：{seller?.display_name || '不明'}
+                        </div>
+
+                        <div className="text-3xl font-bold text-blue-600 mb-5">
+                          ¥{Number(listing.price || 0).toLocaleString()}
+                        </div>
+
+                        <div className="space-y-3">
+                          <button
+                            onClick={() => handleBuyListing(listing.id)}
+                            disabled={isOwnListing || buyingListingId === listing.id}
+                            className={`w-full py-4 rounded-2xl font-medium text-white shadow-sm transition ${
+                              isOwnListing || buyingListingId === listing.id
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : 'bg-blue-600 hover:bg-blue-700'
+                            }`}
+                          >
+                            {isOwnListing
+                              ? '自分の出品です'
+                              : buyingListingId === listing.id
+                                ? '購入中...'
+                                : 'この作品を購入する'}
+                          </button>
+
+                          <Link
+                            href={`/listing/${listing.id}`}
+                            className="block w-full text-center border border-gray-200 hover:bg-gray-50 py-4 rounded-2xl font-medium transition"
+                          >
+                            詳細を見る
+                          </Link>
                         </div>
                       </div>
                     </div>
