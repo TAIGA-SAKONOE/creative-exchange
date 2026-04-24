@@ -243,11 +243,13 @@ export default function NewListing() {
               </p>
             </div>
 
-            <ProductMarketStatsCard
-              selectedCategoryName={selectedCategoryName}
-              stats={marketStats}
-              loading={marketStatsLoading}
-            />
+            {selectedCategoryName && (
+  <ProductMarketStatsCard
+    selectedCategoryName={selectedCategoryName}
+    stats={marketStats}
+    loading={marketStatsLoading}
+  />
+)}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
