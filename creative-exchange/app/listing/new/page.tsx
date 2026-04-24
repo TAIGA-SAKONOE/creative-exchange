@@ -3,9 +3,23 @@
 import { createClient } from '../../../lib/supabase/client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import ProductMarketStatsCard from '../../components/ProductMarketStatsCard'
+
+type Category = {
+  id: number
+  name: string
+}
+
+type ProductMarketStats = {
+  count: number
+  average: number
+  median: number
+  min: number
+  max: number
+} | null
 
 export default function NewListing() {
-  const [categories, setCategories] = useState<any[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [profile, setProfile] = useState<any>(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -14,11 +28,16 @@ export default function NewListing() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  const [marketStats, setMarketStats] = useState<ProductMarketStats>(null)
+  const [marketStatsLoading, setMarketStatsLoading] = useState(false)
+
   const router = useRouter()
 
   useEffect(() => {
     const init = async () => {
       const supabase = createClient()
+
       const {
         data: { user },
       } = await supabase.auth.getUser()
@@ -41,12 +60,83 @@ export default function NewListing() {
         .select('*')
         .order('name')
 
-      setCategories(cats || [])
+      setCategories((cats || []) as Category[])
       setLoading(false)
     }
 
     init()
   }, [router])
+
+  const getMedian = (numbers: number[]) => {
+    if (numbers.length === 0) return 0
+
+    const sorted = [...numbers].sort((a, b) => a - b)
+    const middle = Math.floor(sorted.length / 2)
+
+    if (sorted.length % 2 === 0) {
+      return (sorted[middle - 1] + sorted[middle]) / 2
+    }
+
+    return sorted[middle]
+  }
+
+  const loadMarketStats = async (selectedCategoryId: string) => {
+    if (!selectedCategoryId) {
+      setMarketStats(null)
+      return
+    }
+
+    setMarketStatsLoading(true)
+
+    try {
+      const supabase = createClient()
+
+      const since = new Date()
+      since.setDate(since.getDate() - 90)
+
+      const { data, error } = await supabase
+        .from('product_purchases')
+        .select('price, created_at')
+        .eq('category_id', Number(selectedCategoryId))
+        .gte('created_at', since.toISOString())
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('market stats fetch error:', error)
+        setMarketStats(null)
+        return
+      }
+
+      const prices = (data || [])
+        .map((row: any) => Number(row.price || 0))
+        .filter((value) => Number.isFinite(value) && value > 0)
+
+      if (prices.length === 0) {
+        setMarketStats(null)
+        return
+      }
+
+      const count = prices.length
+      const average = prices.reduce((sum, value) => sum + value, 0) / count
+      const median = getMedian(prices)
+      const min = Math.min(...prices)
+      const max = Math.max(...prices)
+
+      setMarketStats({
+        count,
+        average,
+        median,
+        min,
+        max,
+      })
+    } finally {
+      setMarketStatsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadMarketStats(categoryId)
+  }, [categoryId])
 
   const handleSubmit = async () => {
     if (!profile || !title.trim() || !price || !categoryId) {
@@ -99,6 +189,9 @@ export default function NewListing() {
     }
   }
 
+  const selectedCategoryName =
+    categories.find((cat) => cat.id === Number(categoryId))?.name || ''
+
   if (loading) return <div className="p-12 text-center">読み込み中...</div>
 
   return (
@@ -150,6 +243,12 @@ export default function NewListing() {
               </p>
             </div>
 
+            <ProductMarketStatsCard
+              selectedCategoryName={selectedCategoryName}
+              stats={marketStats}
+              loading={marketStatsLoading}
+            />
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 価格（円） *
@@ -162,6 +261,9 @@ export default function NewListing() {
                 placeholder="5000"
                 min="100"
               />
+              <p className="mt-2 text-sm text-gray-500">
+                実売相場を見ながら、販売価格を決められます。
+              </p>
             </div>
 
             <div>
