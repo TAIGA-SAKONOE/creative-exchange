@@ -23,6 +23,11 @@ type ProductMarketStatRow = {
   transaction_count: number
 }
 
+type CategoryRow = {
+  id: number
+  name: string
+}
+
 export default function MarketPage() {
   const [activeTab, setActiveTab] = useState<'requests' | 'products'>('requests')
   const [requestMarketData, setRequestMarketData] = useState<any[]>([])
@@ -45,8 +50,7 @@ export default function MarketPage() {
 
         if (error) throw error
 
-        const requestResults = []
-        const productResults = []
+        const categoryRows = (categories || []) as CategoryRow[]
 
         const getMedian = (numbers: number[]) => {
           if (numbers.length === 0) return 0
@@ -80,78 +84,82 @@ export default function MarketPage() {
         const since = new Date()
         since.setDate(since.getDate() - 90)
 
-        for (const category of categories || []) {
-          const { data, error: statsError } = await supabase.rpc(
-            'calculate_market_stats',
-            {
-              p_category_id: category.id,
-              p_days: 90,
+        const requestResults = await Promise.all(
+          categoryRows.map(async (category) => {
+            const { data, error: statsError } = await supabase.rpc(
+              'calculate_market_stats',
+              {
+                p_category_id: category.id,
+                p_days: 90,
+              }
+            )
+
+            if (statsError) {
+              console.error('market stats error', category.name, statsError)
             }
-          )
 
-          if (statsError) {
-            console.error('market stats error', category.name, statsError)
-          }
+            const requestStats: MarketStatRow =
+              Array.isArray(data) && data.length > 0
+                ? data[0]
+                : {
+                    median_price: null,
+                    avg_price: null,
+                    p25_price: null,
+                    p75_price: null,
+                    transaction_count: 0,
+                    confidence_label: '参考値',
+                  }
 
-          const requestStats: MarketStatRow =
-            Array.isArray(data) && data.length > 0
-              ? data[0]
-              : {
-                  median_price: null,
-                  avg_price: null,
-                  p25_price: null,
-                  p75_price: null,
-                  transaction_count: 0,
-                  confidence_label: '参考値',
-                }
-
-          requestResults.push({
-            ...category,
-            stats: requestStats,
+            return {
+              ...category,
+              stats: requestStats,
+            }
           })
+        )
 
-          const { data: productRows, error: productError } = await supabase
-            .from('product_purchases')
-            .select('price, created_at')
-            .eq('category_id', category.id)
-            .gte('created_at', since.toISOString())
-            .order('created_at', { ascending: false })
+        const productResults = await Promise.all(
+          categoryRows.map(async (category) => {
+            const { data: productRows, error: productError } = await supabase
+              .from('product_purchases')
+              .select('price, created_at')
+              .eq('category_id', category.id)
+              .gte('created_at', since.toISOString())
+              .order('created_at', { ascending: false })
 
-          if (productError) {
-            console.error('product market stats error', category.name, productError)
-          }
+            if (productError) {
+              console.error('product market stats error', category.name, productError)
+            }
 
-          const prices = (productRows || [])
-            .map((row: any) => Number(row.price || 0))
-            .filter((price) => Number.isFinite(price) && price > 0)
+            const prices = (productRows || [])
+              .map((row: any) => Number(row.price || 0))
+              .filter((price) => Number.isFinite(price) && price > 0)
 
-          const productStats: ProductMarketStatRow =
-            prices.length > 0
-              ? {
-                  median_price: getMedian(prices),
-                  avg_price:
-                    prices.reduce((sum, price) => sum + price, 0) / prices.length,
-                  min_price: Math.min(...prices),
-                  max_price: Math.max(...prices),
-                  transaction_count: prices.length,
-                }
-              : {
-                  median_price: null,
-                  avg_price: null,
-                  min_price: null,
-                  max_price: null,
-                  transaction_count: 0,
-                }
+            const productStats: ProductMarketStatRow =
+              prices.length > 0
+                ? {
+                    median_price: getMedian(prices),
+                    avg_price:
+                      prices.reduce((sum, price) => sum + price, 0) / prices.length,
+                    min_price: Math.min(...prices),
+                    max_price: Math.max(...prices),
+                    transaction_count: prices.length,
+                  }
+                : {
+                    median_price: null,
+                    avg_price: null,
+                    min_price: null,
+                    max_price: null,
+                    transaction_count: 0,
+                  }
 
-          productResults.push({
-            ...category,
-            stats: productStats,
-            p25_price:
-              prices.length > 0 ? getPercentile(prices, 0.25) : null,
-            p75_price:
-              prices.length > 0 ? getPercentile(prices, 0.75) : null,
+            return {
+              ...category,
+              stats: productStats,
+              p25_price: prices.length > 0 ? getPercentile(prices, 0.25) : null,
+              p75_price: prices.length > 0 ? getPercentile(prices, 0.75) : null,
+            }
           })
-        }
+        )
 
         setRequestMarketData(requestResults)
         setProductMarketData(productResults)
