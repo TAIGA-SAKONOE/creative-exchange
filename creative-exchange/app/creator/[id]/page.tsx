@@ -290,7 +290,7 @@ export default function CreatorProfile() {
           title: `${creatorName}への事前相談`,
           description:
             '事前相談用の下書きです。依頼内容・予算・納期などをチャットで相談してください。',
-          agreed_price: null,
+          agreed_price: 0,
           deadline: null,
           specification: {
             type: 'creator_consultation',
