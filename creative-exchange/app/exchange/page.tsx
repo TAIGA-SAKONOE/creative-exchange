@@ -56,11 +56,27 @@ type CategoryOption = {
   name: string
 }
 
+type SkillTag = {
+  id: string
+  name: string
+  parent_category: string | null
+}
+
 type CreatorCategoryMap = Record<
   string,
   {
     ids: number[]
     names: string[]
+  }
+>
+
+type CreatorSkillTagMap = Record<
+  string,
+  {
+    ids: string[]
+    names: string[]
+    parentCategories: string[]
+    tags: SkillTag[]
   }
 >
 
@@ -71,6 +87,8 @@ type SellerMap = Record<
     twitter_handle: string | null
   }
 >
+
+const PARENT_CATEGORIES = ['音楽', 'イラスト', '動画', '文章', 'その他']
 
 export default function ExchangePage() {
   return (
@@ -109,7 +127,9 @@ function ExchangePageContent() {
   const [creators, setCreators] = useState<CreatorItem[]>([])
   const [listings, setListings] = useState<ListingItem[]>([])
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([])
+  const [allSkillTags, setAllSkillTags] = useState<SkillTag[]>([])
   const [creatorCategoryMap, setCreatorCategoryMap] = useState<CreatorCategoryMap>({})
+  const [creatorSkillTagMap, setCreatorSkillTagMap] = useState<CreatorSkillTagMap>({})
   const [sellerMap, setSellerMap] = useState<SellerMap>({})
   const [activeTab, setActiveTab] = useState<'requests' | 'creators' | 'listings'>(initialTab)
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null)
@@ -123,6 +143,8 @@ function ExchangePageContent() {
   const [maxBudget, setMaxBudget] = useState('')
 
   const [creatorCategoryId, setCreatorCategoryId] = useState('')
+  const [creatorParentCategory, setCreatorParentCategory] = useState('')
+  const [creatorSkillTagKeyword, setCreatorSkillTagKeyword] = useState('')
   const [creatorNameKeyword, setCreatorNameKeyword] = useState('')
   const [creatorBioKeyword, setCreatorBioKeyword] = useState('')
   const [creatorSkillKeyword, setCreatorSkillKeyword] = useState('')
@@ -204,6 +226,18 @@ function ExchangePageContent() {
 
         setCategoryOptions((categoryRows || []) as CategoryOption[])
 
+        const { data: skillTagRows, error: skillTagError } = await supabase
+          .from('skill_tags')
+          .select('id, name, parent_category')
+          .order('name', { ascending: true })
+
+        if (skillTagError) {
+          console.error('スキルサブカテゴリ一覧の取得に失敗しました', skillTagError)
+          setAllSkillTags([])
+        } else {
+          setAllSkillTags((skillTagRows || []) as SkillTag[])
+        }
+
         const { data: openOrders, error: ordersError } = await supabase
           .from('orders')
           .select(`
@@ -249,6 +283,7 @@ function ExchangePageContent() {
 
         if (creatorIds.length === 0) {
           setCreatorCategoryMap({})
+          setCreatorSkillTagMap({})
         } else {
           const { data: categoryLinks, error: categoryLinksError } = await supabase
             .from('user_categories')
@@ -292,6 +327,77 @@ function ExchangePageContent() {
 
             setCreatorCategoryMap(nextMap)
           }
+
+          const { data: skillLinks, error: skillLinksError } = await supabase
+            .from('user_skill_tags')
+            .select(`
+              user_id,
+              skill_tag_id,
+              skill_tags (
+                id,
+                name,
+                parent_category
+              )
+            `)
+            .in('user_id', creatorIds)
+
+          if (skillLinksError) {
+            console.error('クリエイタースキルサブカテゴリの取得に失敗しました', skillLinksError)
+            setCreatorSkillTagMap({})
+          } else {
+            const nextSkillMap: CreatorSkillTagMap = {}
+
+            ;(skillLinks || []).forEach((row: any) => {
+              const userId = row.user_id
+
+              const tag = Array.isArray(row.skill_tags)
+                ? row.skill_tags[0]
+                : row.skill_tags
+
+              if (!tag) return
+
+              const tagId = tag.id || row.skill_tag_id
+              const tagName = tag.name || ''
+              const parentCategory = tag.parent_category || 'その他'
+
+              if (!tagName) return
+
+              if (!nextSkillMap[userId]) {
+                nextSkillMap[userId] = {
+                  ids: [],
+                  names: [],
+                  parentCategories: [],
+                  tags: [],
+                }
+              }
+
+              if (!nextSkillMap[userId].ids.includes(tagId)) {
+                nextSkillMap[userId].ids.push(tagId)
+              }
+
+              if (!nextSkillMap[userId].names.includes(tagName)) {
+                nextSkillMap[userId].names.push(tagName)
+              }
+
+              if (!nextSkillMap[userId].parentCategories.includes(parentCategory)) {
+                nextSkillMap[userId].parentCategories.push(parentCategory)
+              }
+
+              const alreadyExists = nextSkillMap[userId].tags.some(
+                (existingTag) => existingTag.id === tagId
+              )
+
+              if (!alreadyExists) {
+                nextSkillMap[userId].tags.push({
+                  id: tagId,
+                  name: tagName,
+                  parent_category: parentCategory,
+                })
+              }
+            })
+
+            setCreatorSkillTagMap(nextSkillMap)
+          }
         }
 
         const { data: listingRows, error: listingsError } = await supabase
@@ -319,7 +425,9 @@ function ExchangePageContent() {
         const activeListings = (listingRows ?? []) as unknown as ListingItem[]
         setListings(activeListings)
 
-        const sellerIds = [...new Set(activeListings.map((listing) => listing.seller_user_id).filter(Boolean))]
+        const sellerIds = [
+          ...new Set(activeListings.map((listing) => listing.seller_user_id).filter(Boolean)),
+        ]
 
         if (sellerIds.length > 0) {
           const { data: sellerRows, error: sellersError } = await supabase
@@ -414,6 +522,18 @@ function ExchangePageContent() {
     return creatorCategoryMap[userId]?.ids || []
   }
 
+  const getCreatorSkillTags = (userId: string) => {
+    return creatorSkillTagMap[userId]?.tags || []
+  }
+
+  const getCreatorSkillTagNames = (userId: string) => {
+    return creatorSkillTagMap[userId]?.names || []
+  }
+
+  const getCreatorSkillParentCategories = (userId: string) => {
+    return creatorSkillTagMap[userId]?.parentCategories || []
+  }
+
   const getListingImage = (imageUrls: string[] | null) => {
     if (!imageUrls || imageUrls.length === 0) return null
     return imageUrls[0]
@@ -490,6 +610,14 @@ function ExchangePageContent() {
     loadListingMarketStats(listingCategoryId)
   }, [listingCategoryId])
 
+  const skillTagDatalistOptions = useMemo(() => {
+    const parentFiltered = creatorParentCategory
+      ? allSkillTags.filter((tag) => (tag.parent_category || 'その他') === creatorParentCategory)
+      : allSkillTags
+
+    return parentFiltered.map((tag) => tag.name)
+  }, [allSkillTags, creatorParentCategory])
+
   const filteredOrders = useMemo(() => {
     const parsedMinBudget = minBudget.trim() === '' ? null : Number(minBudget)
     const parsedMaxBudget = maxBudget.trim() === '' ? null : Number(maxBudget)
@@ -534,7 +662,15 @@ function ExchangePageContent() {
         matchMaxBudget
       )
     })
-  }, [orders, requestCategoryId, titleKeyword, descriptionKeyword, minBudget, maxBudget, categoryOptions])
+  }, [
+    orders,
+    requestCategoryId,
+    titleKeyword,
+    descriptionKeyword,
+    minBudget,
+    maxBudget,
+    categoryOptions,
+  ])
 
   const filteredCreators = useMemo(() => {
     return creators.filter((creator) => {
@@ -542,10 +678,30 @@ function ExchangePageContent() {
       const bio = creator.bio || ''
       const skillsText = getSkillText(creator)
       const creatorCategoryIds = getCreatorCategoryIds(creator.id)
+      const creatorSkillTags = getCreatorSkillTags(creator.id)
+      const creatorSkillTagNames = getCreatorSkillTagNames(creator.id)
+      const creatorParentCategories = getCreatorSkillParentCategories(creator.id)
+
+      const normalizedSkillTagKeyword = creatorSkillTagKeyword.trim().toLowerCase()
 
       const matchCategory =
         creatorCategoryId === '' ||
         creatorCategoryIds.includes(Number(creatorCategoryId))
+
+      const matchParentCategory =
+        creatorParentCategory === '' ||
+        creatorParentCategories.includes(creatorParentCategory)
+
+      const matchSkillTag =
+        normalizedSkillTagKeyword === '' ||
+        creatorSkillTagNames.some((name) =>
+          name.toLowerCase().includes(normalizedSkillTagKeyword)
+        ) ||
+        creatorSkillTags.some((tag) =>
+          `${tag.parent_category || 'その他'} ${tag.name}`
+            .toLowerCase()
+            .includes(normalizedSkillTagKeyword)
+        )
 
       const matchName =
         creatorNameKeyword.trim() === '' ||
@@ -559,15 +715,25 @@ function ExchangePageContent() {
         creatorSkillKeyword.trim() === '' ||
         skillsText.toLowerCase().includes(creatorSkillKeyword.toLowerCase())
 
-      return matchCategory && matchName && matchBio && matchSkill
+      return (
+        matchCategory &&
+        matchParentCategory &&
+        matchSkillTag &&
+        matchName &&
+        matchBio &&
+        matchSkill
+      )
     })
   }, [
     creators,
     creatorCategoryId,
+    creatorParentCategory,
+    creatorSkillTagKeyword,
     creatorNameKeyword,
     creatorBioKeyword,
     creatorSkillKeyword,
     creatorCategoryMap,
+    creatorSkillTagMap,
   ])
 
   const filteredListings = useMemo(() => {
@@ -597,7 +763,14 @@ function ExchangePageContent() {
 
       return categoryMatch && titleMatch && minPriceMatch && maxPriceMatch
     })
-  }, [listings, listingCategoryId, listingTitleKeyword, listingMinPrice, listingMaxPrice, categoryOptions])
+  }, [
+    listings,
+    listingCategoryId,
+    listingTitleKeyword,
+    listingMinPrice,
+    listingMaxPrice,
+    categoryOptions,
+  ])
 
   const selectedListingCategoryName =
     categoryOptions.find((cat) => cat.id === Number(listingCategoryId))?.name || ''
@@ -1121,6 +1294,24 @@ function ExchangePageContent() {
                       </div>
                     </div>
 
+                    <div className="mb-6">
+                      <p className="text-sm text-gray-500 mb-2">スキルサブカテゴリ</p>
+                      <div className="flex flex-wrap gap-2">
+                        {getCreatorSkillTags(currentUser.id).length > 0 ? (
+                          getCreatorSkillTags(currentUser.id).map((tag) => (
+                            <span
+                              key={tag.id}
+                              className="inline-flex px-3 py-1.5 rounded-full bg-purple-50 text-purple-700 text-sm font-medium border border-purple-100"
+                            >
+                              {tag.parent_category || 'その他'}：{tag.name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-gray-500">未設定</span>
+                        )}
+                      </div>
+                    </div>
+
                     <div>
                       <p className="text-sm text-gray-500 mb-2">補足スキル・得意領域</p>
                       <p className="text-gray-700">{getSkillText(currentUser)}</p>
@@ -1175,7 +1366,7 @@ function ExchangePageContent() {
                 <div>
                   <h2 className="text-2xl font-bold">クリエイターを検索</h2>
                   <p className="text-sm text-gray-500 mt-2">
-                    納品できる品目・表示名・自己紹介・補足スキルから探せます
+                    品目・スキルサブカテゴリ・表示名・自己紹介から探せます
                   </p>
                 </div>
                 <div className="text-sm text-gray-500">
@@ -1183,7 +1374,7 @@ function ExchangePageContent() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-2">
                     納品できる品目
@@ -1200,6 +1391,43 @@ function ExchangePageContent() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                    大カテゴリ
+                  </label>
+                  <select
+                    value={creatorParentCategory}
+                    onChange={(e) => setCreatorParentCategory(e.target.value)}
+                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+                  >
+                    <option value="">すべて</option>
+                    {PARENT_CATEGORIES.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                    サブカテゴリ
+                  </label>
+                  <input
+                    type="text"
+                    value={creatorSkillTagKeyword}
+                    onChange={(e) => setCreatorSkillTagKeyword(e.target.value)}
+                    placeholder="例: ボカロ曲"
+                    list="skill-tag-filter-options"
+                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
+                  />
+                  <datalist id="skill-tag-filter-options">
+                    {skillTagDatalistOptions.map((name) => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div>
@@ -1223,7 +1451,7 @@ function ExchangePageContent() {
                     type="text"
                     value={creatorBioKeyword}
                     onChange={(e) => setCreatorBioKeyword(e.target.value)}
-                    placeholder="例: イラスト / 書家"
+                    placeholder="例: イラスト"
                     className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
                   />
                 </div>
@@ -1236,7 +1464,7 @@ function ExchangePageContent() {
                     type="text"
                     value={creatorSkillKeyword}
                     onChange={(e) => setCreatorSkillKeyword(e.target.value)}
-                    placeholder="例: 和風題字 / レトロ調"
+                    placeholder="例: レトロ調"
                     className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
                   />
                 </div>
@@ -1256,6 +1484,7 @@ function ExchangePageContent() {
                 {filteredCreators.map((creator) => {
                   const portfolioUrl = getFirstPortfolioUrl(creator)
                   const categoryNames = getCreatorCategoryNames(creator.id)
+                  const skillTags = getCreatorSkillTags(creator.id)
 
                   return (
                     <div
@@ -1296,6 +1525,24 @@ function ExchangePageContent() {
                                     className="inline-flex px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-sm font-medium border border-blue-100"
                                   >
                                     {name}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-gray-500">未設定</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="mb-6">
+                            <p className="text-sm text-gray-500 mb-2">スキルサブカテゴリ</p>
+                            <div className="flex flex-wrap gap-2">
+                              {skillTags.length > 0 ? (
+                                skillTags.map((tag) => (
+                                  <span
+                                    key={tag.id}
+                                    className="inline-flex px-3 py-1.5 rounded-full bg-purple-50 text-purple-700 text-sm font-medium border border-purple-100"
+                                  >
+                                    {tag.parent_category || 'その他'}：{tag.name}
                                   </span>
                                 ))
                               ) : (
