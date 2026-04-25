@@ -185,6 +185,7 @@ function MarketPageContent() {
           openStepsResult,
           creatorCategoriesResult,
           productPurchaseResult,
+          portfolioWorksResult,
         ] = await Promise.all([
           supabase
             .from('order_steps')
@@ -213,11 +214,17 @@ function MarketPageContent() {
           // 注意：
           // product_purchases には created_at カラムが存在しないため、
           // 作品相場は現時点では全件ベースで集計する。
-          // 日付カラムを追加・確認できたら、後で直近90日フィルターを復活させる。
           supabase
             .from('product_purchases')
             .select('category_id, price')
             .gt('price', 0),
+
+          // ポートフォリオ作品の登録価格を作品相場の参考値として使用
+          supabase
+            .from('portfolio_works')
+            .select('category_id, price_range_min')
+            .eq('is_public', true)
+            .gt('price_range_min', 0),
         ])
 
         if (stepResult.error) throw stepResult.error
@@ -270,6 +277,25 @@ function MarketPageContent() {
         ;(productPurchaseResult.data || []).forEach((row: any) => {
           const categoryId = Number(row.category_id)
           const price = Number(row.price)
+
+          if (
+            Number.isFinite(categoryId) &&
+            Number.isFinite(price) &&
+            price > 0 &&
+            categoryById.has(categoryId)
+          ) {
+            productPricePoints.push({
+              category_id: categoryId,
+              price,
+            })
+          }
+        })
+
+        // ポートフォリオ作品の登録価格を参考値として追加
+        // 実取引データと区別するため、ラベルは「参考価格を含む」と表示
+        ;(portfolioWorksResult.data || []).forEach((row: any) => {
+          const categoryId = Number(row.category_id)
+          const price = Number(row.price_range_min)
 
           if (
             Number.isFinite(categoryId) &&
