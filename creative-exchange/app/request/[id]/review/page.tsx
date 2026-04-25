@@ -33,7 +33,13 @@ type StepData = {
 
 export default function ReviewPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50 p-12 text-center">読み込み中...</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50 p-12 text-center text-gray-500">
+          読み込み中...
+        </div>
+      }
+    >
       <ReviewPageContent />
     </Suspense>
   )
@@ -63,6 +69,7 @@ function ReviewPageContent() {
 
   useEffect(() => {
     loadReviewTarget()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId, stepId])
 
   const getStepCreatorName = (targetStep: StepData | null) => {
@@ -220,6 +227,32 @@ function ReviewPageContent() {
     }
   }
 
+  const checkExistingReview = async () => {
+    if (!profile?.id) return null
+
+    const supabase = createClient()
+
+    let query = supabase
+      .from('reviews')
+      .select('id')
+      .eq('order_id', orderId)
+      .eq('reviewer_id', profile.id)
+
+    if (stepId) {
+      query = query.eq('order_step_id', stepId)
+    } else {
+      query = query.is('order_step_id', null)
+    }
+
+    const { data, error } = await query.maybeSingle()
+
+    if (error) {
+      throw error
+    }
+
+    return data
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -238,25 +271,15 @@ function ReviewPageContent() {
     try {
       const supabase = createClient()
 
-      const { data: existingReview, error: existingError } = await supabase
-        .from('reviews')
-        .select('id')
-        .eq('order_id', orderId)
-        .eq('reviewer_id', profile.id)
-        .eq(stepId ? 'order_step_id' : 'order_id', stepId || orderId)
-        .maybeSingle()
-
-      if (existingError) {
-        console.error('既存レビュー確認エラー:', existingError)
-      }
+      const existingReview = await checkExistingReview()
 
       if (existingReview) {
-        alert('この取引はすでに評価済みです')
+        alert('この取引または工程はすでに評価済みです')
         router.push(`/request/${orderId}`)
         return
       }
 
-      const { error: insertError } = await supabase.from('reviews').insert({
+      const reviewPayload = {
         order_id: orderId,
         order_step_id: stepId || null,
         reviewer_id: profile.id,
@@ -264,11 +287,27 @@ function ReviewPageContent() {
         rating,
         comment: comment.trim() || null,
         role,
-      })
+      }
 
-      if (insertError) throw insertError
+      const { data: insertedReview, error: insertError } = await supabase
+        .from('reviews')
+        .insert(reviewPayload)
+        .select('id, order_id, order_step_id, reviewer_id, reviewee_id, rating, comment, role, created_at')
+        .single()
 
-      await supabase.from('notifications').insert({
+      if (insertError) {
+        throw new Error(`レビュー保存エラー: ${insertError.message}`)
+      }
+
+      if (!insertedReview) {
+        throw new Error('レビュー保存後の確認データを取得できませんでした')
+      }
+
+      if (stepId && insertedReview.order_step_id !== stepId) {
+        throw new Error('レビューは保存されましたが、工程IDが正しく保存されませんでした')
+      }
+
+      const { error: notificationError } = await supabase.from('notifications').insert({
         user_id: revieweeId,
         type: 'review_received',
         title: '新しい評価が届きました',
@@ -277,6 +316,15 @@ function ReviewPageContent() {
           : `「${order.title}」に評価が届きました。`,
         link_url: `/request/${orderId}`,
       })
+
+      if (notificationError) {
+        alert(
+          '評価は保存されましたが、通知の作成に失敗しました: ' +
+            notificationError.message
+        )
+        router.push(`/request/${orderId}`)
+        return
+      }
 
       alert('評価を送信しました')
       router.push(`/request/${orderId}`)
@@ -342,9 +390,7 @@ function ReviewPageContent() {
           <div className="bg-gray-50 rounded-2xl p-5 mb-8">
             <p className="text-sm text-gray-500 mb-2">評価対象</p>
             <p className="font-bold text-gray-900 mb-2">{reviewDescription}</p>
-            <p className="text-sm text-gray-600">
-              評価相手：{revieweeName}
-            </p>
+            <p className="text-sm text-gray-600">評価相手：{revieweeName}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-8">
@@ -369,9 +415,7 @@ function ReviewPageContent() {
                 ))}
               </div>
 
-              <p className="mt-3 text-sm text-gray-500">
-                {rating} / 5
-              </p>
+              <p className="mt-3 text-sm text-gray-500">{rating} / 5</p>
             </div>
 
             <div>
