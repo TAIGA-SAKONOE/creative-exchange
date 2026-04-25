@@ -41,6 +41,26 @@ const createEmptyStep = (index: number): RequestStepInput => ({
   deadline: '',
 })
 
+const getTodayDateString = () => {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const isPastDate = (dateString: string) => {
+  if (!dateString) return false
+
+  const today = new Date()
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+
+  const target = new Date(dateString)
+  const targetStart = new Date(target.getFullYear(), target.getMonth(), target.getDate())
+
+  return targetStart.getTime() < todayStart.getTime()
+}
+
 export default function NewRequest() {
   return (
     <Suspense fallback={<div className="p-12 text-center">読み込み中...</div>}>
@@ -68,6 +88,7 @@ function NewRequestContent() {
   const searchParams = useSearchParams()
   const creatorIdParam = searchParams.get('creator_id')
 
+  const todayDateString = getTodayDateString()
   const isMultiStep = steps.length >= 2
 
   const totalBudget = useMemo(() => {
@@ -258,6 +279,11 @@ function NewRequestContent() {
           alert(`${label}の予算は0以上の数値で入力してください`)
           return false
         }
+      }
+
+      if (step.deadline && isPastDate(step.deadline)) {
+        alert(`${label}の納期に過去日は指定できません`)
+        return false
       }
     }
 
@@ -596,6 +622,7 @@ function NewRequestContent() {
                         </label>
                         <input
                           type="date"
+                          min={todayDateString}
                           value={step.deadline}
                           onChange={(e) =>
                             updateStep(index, 'deadline', e.target.value)
