@@ -364,26 +364,7 @@ export default function CreatorProfile() {
                 </div>
               </div>
 
-              {!isOwnProfile && (
-                <div className="w-full md:w-72 space-y-3">
-                  <button
-                    onClick={handleCreateConsultation}
-                    disabled={creatingConsultation}
-                    className="w-full bg-white text-blue-700 hover:bg-blue-50 disabled:bg-gray-200 disabled:text-gray-500 py-4 rounded-2xl font-bold shadow-sm transition"
-                  >
-                    {creatingConsultation
-                      ? '相談を作成中...'
-                      : 'このクリエイターに相談する'}
-                  </button>
-
-                  <Link
-                    href={`/request/new?creator_id=${creatorId}`}
-                    className="block w-full text-center bg-blue-900/40 hover:bg-blue-900/60 text-white border border-white/30 py-4 rounded-2xl font-bold transition"
-                  >
-                    このクリエイターに依頼する
-                  </Link>
-                </div>
-              )}
+            
             </div>
 
             {creator.bio && (
