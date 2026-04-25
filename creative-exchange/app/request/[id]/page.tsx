@@ -64,6 +64,7 @@ export default function RequestDetail() {
 
   const [selectedStepFiles, setSelectedStepFiles] = useState<Record<string, File | null>>({})
   const [uploadingStepId, setUploadingStepId] = useState<string | null>(null)
+  const [completingStepId, setCompletingStepId] = useState<string | null>(null)
 
   const [messageText, setMessageText] = useState('')
   const [sendingMessage, setSendingMessage] = useState(false)
@@ -406,6 +407,56 @@ export default function RequestDetail() {
       alert('工程納品に失敗しました: ' + err.message)
     } finally {
       setUploadingStepId(null)
+    }
+  }
+
+  const handleCompleteStep = async (step: OrderStep) => {
+    if (!profile?.id || !request) return
+
+    if (String(request.client_id) !== String(profile.id)) {
+      alert('依頼者本人のみ検収できます')
+      return
+    }
+
+    if (step.status !== 'delivered') {
+      alert('この工程はまだ検収できる状態ではありません')
+      return
+    }
+
+    const confirmed = window.confirm(`工程「${step.title}」を検収OKにしますか？`)
+    if (!confirmed) return
+
+    setCompletingStepId(step.id)
+    const supabase = createClient()
+
+    try {
+      const { error: updateStepError } = await supabase
+        .from('order_steps')
+        .update({
+          status: 'completed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', step.id)
+        .eq('status', 'delivered')
+
+      if (updateStepError) throw updateStepError
+
+      if (step.creator_id) {
+        await createNotification({
+          userId: step.creator_id,
+          type: 'order_step_completed',
+          title: '工程が検収完了しました',
+          body: `「${request.title}」の工程「${step.title}」が検収完了になりました。`,
+          linkUrl: `/request/${id}`,
+        })
+      }
+
+      alert('工程を検収完了にしました')
+      loadData()
+    } catch (err: any) {
+      alert('工程の検収に失敗しました: ' + err.message)
+    } finally {
+      setCompletingStepId(null)
     }
   }
 
@@ -769,7 +820,9 @@ export default function RequestDetail() {
         ? hasOrderSteps
           ? openSteps > 0
             ? '公開中'
-            : '工程進行中'
+            : completedSteps === orderSteps.length
+              ? '取引完了'
+              : '工程進行中'
           : '公開中'
         : request.status === 'matched'
           ? '受注済み'
@@ -934,10 +987,16 @@ export default function RequestDetail() {
                       const creatorName = getStepCreatorName(step)
                       const deadlineLabel = formatDate(step.deadline)
                       const stepDeliverables = getStepDeliverables(step.id)
+
                       const canDeliverThisStep =
                         profile?.id &&
                         String(step.creator_id) === String(profile.id) &&
                         step.status === 'matched'
+
+                      const canCompleteThisStep =
+                        profile?.id &&
+                        String(request.client_id) === String(profile.id) &&
+                        step.status === 'delivered'
 
                       return (
                         <div key={step.id} className="relative flex gap-5">
@@ -1083,6 +1142,28 @@ export default function RequestDetail() {
                             {step.status === 'delivered' && (
                               <div className="mt-4 p-4 bg-orange-50 border border-orange-100 rounded-2xl text-sm text-orange-700">
                                 この工程は納品済みです。依頼者の検収待ちです。
+                              </div>
+                            )}
+
+                            {canCompleteThisStep && (
+                              <div className="mt-5 p-5 bg-green-50 border border-green-100 rounded-2xl">
+                                <p className="font-medium text-green-700 mb-3">
+                                  この工程を検収する
+                                </p>
+
+                                <p className="text-sm text-green-700 leading-7 mb-4">
+                                  納品内容に問題がなければ、この工程を完了にできます。
+                                </p>
+
+                                <button
+                                  onClick={() => handleCompleteStep(step)}
+                                  disabled={completingStepId === step.id}
+                                  className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white py-4 rounded-2xl font-medium shadow-sm"
+                                >
+                                  {completingStepId === step.id
+                                    ? '検収中...'
+                                    : 'この工程を検収OKにする'}
+                                </button>
                               </div>
                             )}
 
@@ -1234,8 +1315,8 @@ export default function RequestDetail() {
             <div className="space-y-4 pt-6 border-t">
               {hasOrderSteps && (
                 <div className="p-5 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-600 leading-7">
-                  工程付き依頼です。工程ごとの納品まで有効化されています。
-                  工程ごとの検収は次フェーズで実装します。
+                  工程付き依頼です。工程ごとの受注・納品・検収が有効化されています。
+                  全工程が完了すると、依頼全体も自動的に完了になります。
                 </div>
               )}
 
