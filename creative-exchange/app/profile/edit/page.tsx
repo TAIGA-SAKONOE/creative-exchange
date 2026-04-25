@@ -30,8 +30,7 @@ type PortfolioWork = {
   category_id: number | null
   image_urls: string[]
   external_url: string
-  price_range_min: string
-  price_range_max: string
+  price: string
   is_public: boolean
   sort_order: number
   imageFiles: File[]
@@ -66,8 +65,7 @@ const createEmptyWork = (): PortfolioWork => ({
   category_id: null,
   image_urls: [],
   external_url: '',
-  price_range_min: '',
-  price_range_max: '',
+  price: '',
   is_public: true,
   sort_order: 0,
   imageFiles: [],
@@ -220,8 +218,7 @@ export default function ProfileEdit() {
             category_id: row.category_id || null,
             image_urls: Array.isArray(row.image_urls) ? row.image_urls : [],
             external_url: row.external_url || '',
-            price_range_min: row.price_range_min ? String(row.price_range_min) : '',
-            price_range_max: row.price_range_max ? String(row.price_range_max) : '',
+            price: row.price_range_min ? String(row.price_range_min) : '',
             is_public: row.is_public !== false,
             sort_order: row.sort_order || 0,
             imageFiles: [],
@@ -535,8 +532,8 @@ export default function ProfileEdit() {
           category_id: work.category_id || null,
           image_urls: uploadedImageUrls,
           external_url: work.external_url.trim() || null,
-          price_range_min: work.price_range_min ? Number(work.price_range_min) : null,
-          price_range_max: work.price_range_max ? Number(work.price_range_max) : null,
+          price_range_min: work.price ? Number(work.price) : null,
+          price_range_max: null,
           is_public: work.is_public,
           sort_order: i,
           updated_at: new Date().toISOString(),
@@ -854,29 +851,17 @@ export default function ProfileEdit() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">価格帯（最低）</label>
-                          <input
-                            type="number"
-                            value={work.price_range_min}
-                            onChange={(e) => updatePortfolioWork(index, { price_range_min: e.target.value })}
-                            className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
-                            placeholder="例：5000"
-                            min="0"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">価格帯（最高）</label>
-                          <input
-                            type="number"
-                            value={work.price_range_max}
-                            onChange={(e) => updatePortfolioWork(index, { price_range_max: e.target.value })}
-                            className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
-                            placeholder="例：30000"
-                            min="0"
-                          />
-                        </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">作品価格（円）</label>
+                        <input
+                          type="number"
+                          value={work.price}
+                          onChange={(e) => updatePortfolioWork(index, { price: e.target.value })}
+                          className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+                          placeholder="例：15000"
+                          min="0"
+                        />
+                        <p className="mt-1 text-xs text-gray-400">相場ボードの参考価格として反映されます</p>
                       </div>
 
                       {/* 画像アップロード */}
