@@ -1,13 +1,20 @@
 'use client'
 
 import { createClient } from '../../../lib/supabase/client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import ProductMarketStatsCard from '../../components/ProductMarketStatsCard'
 
 type Category = {
   id: number
   name: string
+  parent_category: string | null
+  sort_order: number | null
+}
+
+type CategoryGroup = {
+  parentCategory: string
+  items: Category[]
 }
 
 type ProductMarketStats = {
@@ -17,6 +24,25 @@ type ProductMarketStats = {
   min: number
   max: number
 } | null
+
+const groupCategoriesByParent = (categories: Category[]): CategoryGroup[] => {
+  const grouped = new Map<string, Category[]>()
+
+  categories.forEach((category) => {
+    const parent = category.parent_category || 'その他'
+
+    if (!grouped.has(parent)) {
+      grouped.set(parent, [])
+    }
+
+    grouped.get(parent)!.push(category)
+  })
+
+  return Array.from(grouped.entries()).map(([parentCategory, items]) => ({
+    parentCategory,
+    items: items.sort((a, b) => a.name.localeCompare(b.name, 'ja')),
+  }))
+}
 
 export default function NewListing() {
   const [categories, setCategories] = useState<Category[]>([])
@@ -55,10 +81,16 @@ export default function NewListing() {
 
       setProfile(userProfile)
 
-      const { data: cats } = await supabase
+      const { data: cats, error: catsError } = await supabase
         .from('categories')
-        .select('*')
-        .order('name')
+        .select('id, name, parent_category, sort_order')
+        .order('sort_order', { ascending: true })
+        .order('parent_category', { ascending: true })
+        .order('name', { ascending: true })
+
+      if (catsError) {
+        console.error('categories fetch error:', catsError)
+      }
 
       setCategories((cats || []) as Category[])
       setLoading(false)
@@ -66,6 +98,10 @@ export default function NewListing() {
 
     init()
   }, [router])
+
+  const groupedCategories = useMemo(() => {
+    return groupCategoriesByParent(categories)
+  }, [categories])
 
   const getMedian = (numbers: number[]) => {
     if (numbers.length === 0) return 0
@@ -91,15 +127,13 @@ export default function NewListing() {
     try {
       const supabase = createClient()
 
-      const since = new Date()
-      since.setDate(since.getDate() - 90)
-
+      // product_purchases には created_at がないため、
+      // 現時点では作品相場は全件ベースで集計する。
       const { data, error } = await supabase
         .from('product_purchases')
-        .select('price, created_at')
+        .select('price')
         .eq('category_id', Number(selectedCategoryId))
-        .gte('created_at', since.toISOString())
-        .order('created_at', { ascending: false })
+        .gt('price', 0)
 
       if (error) {
         console.error('market stats fetch error:', error)
@@ -228,14 +262,19 @@ export default function NewListing() {
               <select
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200"
+                className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
                 required
               >
                 <option value="">品目を選択してください</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
+
+                {groupedCategories.map((group) => (
+                  <optgroup key={group.parentCategory} label={group.parentCategory}>
+                    {group.items.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
               <p className="mt-2 text-sm text-gray-500">
@@ -244,12 +283,12 @@ export default function NewListing() {
             </div>
 
             {selectedCategoryName && (
-  <ProductMarketStatsCard
-    selectedCategoryName={selectedCategoryName}
-    stats={marketStats}
-    loading={marketStatsLoading}
-  />
-)}
+              <ProductMarketStatsCard
+                selectedCategoryName={selectedCategoryName}
+                stats={marketStats}
+                loading={marketStatsLoading}
+              />
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
