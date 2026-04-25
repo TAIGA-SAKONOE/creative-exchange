@@ -529,6 +529,13 @@ export default function RequestDetail() {
     try {
       const supabase = createClient()
 
+      const otherPendingApplications = applications.filter(
+        (app) =>
+          app.order_step_id === step.id &&
+          app.id !== application.id &&
+          app.status === 'pending'
+      )
+
       const { error: updateStepError } = await supabase
         .from('order_steps')
         .update({
@@ -571,6 +578,18 @@ export default function RequestDetail() {
         body: `「${request.title}」の工程「${step.title}」に採用されました。`,
         linkUrl: `/request/${id}`,
       })
+
+      await Promise.all(
+        otherPendingApplications.map((rejectedApplication) =>
+          createNotification({
+            userId: rejectedApplication.applicant_id,
+            type: 'order_step_application_rejected',
+            title: '工程の選考結果が届きました',
+            body: `「${request.title}」の工程「${step.title}」は、今回は不採用となりました。`,
+            linkUrl: `/request/${id}`,
+          })
+        )
+      )
 
       alert('応募者を採用しました')
       loadData()
@@ -1839,14 +1858,14 @@ export default function RequestDetail() {
                                     </div>
                                   )}
 
-                                  {myApplication && step.status === 'open' && !isClient && (
+                                  {myApplication && !isClient && (
                                     <div className="mt-5 p-4 bg-yellow-50 border border-yellow-100 rounded-2xl">
                                       <div className="flex flex-wrap items-center gap-2 mb-2">
                                         <p className="font-medium text-yellow-800">
                                           {myApplication.status === 'pending'
                                             ? 'この工程に応募中です'
                                             : myApplication.status === 'accepted'
-                                              ? 'この工程に採用済みです'
+                                              ? 'この工程に採用されました'
                                               : myApplication.status === 'rejected'
                                                 ? 'この工程は不採用になりました'
                                                 : 'この工程への応募は取り下げ・解除済みです'}
@@ -1875,9 +1894,21 @@ export default function RequestDetail() {
                                         </button>
                                       )}
 
-                                      {(myApplication.status === 'cancelled' || myApplication.status === 'rejected') && (
+                                      {myApplication.status === 'rejected' && (
+                                        <p className="mt-3 text-sm text-yellow-700">
+                                          今回は不採用でした。工程が再募集になった場合は、再応募できます。
+                                        </p>
+                                      )}
+
+                                      {myApplication.status === 'cancelled' && (
                                         <p className="mt-3 text-sm text-yellow-700">
                                           この工程が募集中であれば、再応募できます。
+                                        </p>
+                                      )}
+
+                                      {myApplication.status === 'accepted' && (
+                                        <p className="mt-3 text-sm text-green-700">
+                                          この工程の担当クリエイターとして採用されています。
                                         </p>
                                       )}
                                     </div>
