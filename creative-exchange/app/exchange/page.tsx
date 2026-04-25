@@ -1,7 +1,7 @@
 'use client'
 
 import { createClient } from '../../lib/supabase/client'
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import ProductMarketStatsCard from '../components/ProductMarketStatsCard'
@@ -73,6 +73,24 @@ type SellerMap = Record<
 >
 
 export default function ExchangePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50 py-12">
+          <div className="max-w-6xl mx-auto px-4">
+            <div className="bg-white rounded-3xl shadow-xl p-10 text-center text-gray-600">
+              Exchangeを読み込み中...
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <ExchangePageContent />
+    </Suspense>
+  )
+}
+
+function ExchangePageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
