@@ -54,20 +54,31 @@ export default function AppHeader() {
                 onMouseEnter={() => setExchangeOpen(true)}
                 onMouseLeave={() => setExchangeOpen(false)}
               >
-                <button
-                  type="button"
-                  onClick={() => {
-                    setExchangeOpen((prev) => !prev)
-                    setMarketOpen(false)
-                  }}
-                  className="w-full md:w-auto px-3 py-2 rounded-xl hover:bg-gray-100 transition text-left md:text-center inline-flex items-center justify-between gap-2"
-                >
-                  <span>Exchange</span>
-                  <span className="text-xs text-gray-500">▼</span>
-                </button>
+                <div className="inline-flex w-full md:w-auto rounded-xl hover:bg-gray-100 transition overflow-hidden">
+                  <Link
+                    href="/exchange?tab=requests"
+                    onClick={closeDropdowns}
+                    className="px-3 py-2"
+                  >
+                    Exchange
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setExchangeOpen((prev) => !prev)
+                      setMarketOpen(false)
+                    }}
+                    className="px-2 py-2 text-xs text-gray-500 hover:bg-gray-200 transition"
+                    aria-label="Exchangeメニューを開く"
+                  >
+                    ▼
+                  </button>
+                </div>
 
                 {exchangeOpen && (
-                  <div className="md:absolute md:left-0 md:top-full md:pt-2 w-full md:w-52 z-50">
+                  <div className="md:absolute md:left-0 md:top-full md:pt-2 w-full md:w-56 z-50">
                     <div className="bg-white border border-gray-200 rounded-2xl shadow-xl p-2">
                       <Link
                         href="/exchange?tab=requests"
@@ -82,7 +93,7 @@ export default function AppHeader() {
                         onClick={closeDropdowns}
                         className="block px-4 py-3 rounded-xl hover:bg-gray-100 transition"
                       >
-                        クリエイターを探す
+                        人を探す
                       </Link>
 
                       <Link
@@ -100,6 +111,16 @@ export default function AppHeader() {
                       >
                         出品する
                       </Link>
+
+                      <div className="my-2 border-t border-gray-100" />
+
+                      <Link
+                        href="/request/new"
+                        onClick={closeDropdowns}
+                        className="block px-4 py-3 rounded-xl hover:bg-blue-50 text-blue-700 font-medium transition"
+                      >
+                        新しい依頼を作成
+                      </Link>
                     </div>
                   </div>
                 )}
@@ -110,17 +131,28 @@ export default function AppHeader() {
                 onMouseEnter={() => setMarketOpen(true)}
                 onMouseLeave={() => setMarketOpen(false)}
               >
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMarketOpen((prev) => !prev)
-                    setExchangeOpen(false)
-                  }}
-                  className="w-full md:w-auto px-3 py-2 rounded-xl hover:bg-gray-100 transition text-left md:text-center inline-flex items-center justify-between gap-2"
-                >
-                  <span>相場ボード</span>
-                  <span className="text-xs text-gray-500">▼</span>
-                </button>
+                <div className="inline-flex w-full md:w-auto rounded-xl hover:bg-gray-100 transition overflow-hidden">
+                  <Link
+                    href="/market?tab=commission"
+                    onClick={closeDropdowns}
+                    className="px-3 py-2"
+                  >
+                    相場ボード
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setMarketOpen((prev) => !prev)
+                      setExchangeOpen(false)
+                    }}
+                    className="px-2 py-2 text-xs text-gray-500 hover:bg-gray-200 transition"
+                    aria-label="相場ボードメニューを開く"
+                  >
+                    ▼
+                  </button>
+                </div>
 
                 {marketOpen && (
                   <div className="md:absolute md:left-0 md:top-full md:pt-2 w-full md:w-60 z-50">
