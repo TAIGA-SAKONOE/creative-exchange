@@ -3,7 +3,7 @@
 import LoadingState from '../../components/LoadingState'
 import MessageState from '../../components/MessageState'
 import { createClient } from '../../../lib/supabase/client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 
@@ -70,6 +70,9 @@ export default function RequestDetail() {
   const [sendingMessage, setSendingMessage] = useState(false)
 
   const [cancelling, setCancelling] = useState(false)
+
+  const stepFileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const generalFileInputRef = useRef<HTMLInputElement | null>(null)
 
   const router = useRouter()
 
@@ -673,7 +676,6 @@ export default function RequestDetail() {
     if (status === 'open') {
       return {
         label: '募集中',
-        shortLabel: '募集中',
         dotClass: 'bg-blue-600 border-blue-600 text-white',
         badgeClass: 'bg-blue-50 text-blue-700 border border-blue-100',
       }
@@ -682,7 +684,6 @@ export default function RequestDetail() {
     if (status === 'matched') {
       return {
         label: '制作中',
-        shortLabel: '制作中',
         dotClass: 'bg-purple-600 border-purple-600 text-white',
         badgeClass: 'bg-purple-50 text-purple-700 border border-purple-100',
       }
@@ -691,7 +692,6 @@ export default function RequestDetail() {
     if (status === 'delivered') {
       return {
         label: '納品済み',
-        shortLabel: '納品',
         dotClass: 'bg-orange-500 border-orange-500 text-white',
         badgeClass: 'bg-orange-50 text-orange-700 border border-orange-100',
       }
@@ -700,7 +700,6 @@ export default function RequestDetail() {
     if (status === 'completed') {
       return {
         label: '完了',
-        shortLabel: '完了',
         dotClass: 'bg-green-600 border-green-600 text-white',
         badgeClass: 'bg-green-50 text-green-700 border border-green-100',
       }
@@ -709,7 +708,6 @@ export default function RequestDetail() {
     if (status === 'cancelled') {
       return {
         label: 'キャンセル',
-        shortLabel: '中止',
         dotClass: 'bg-gray-400 border-gray-400 text-white',
         badgeClass: 'bg-gray-100 text-gray-600 border border-gray-200',
       }
@@ -717,7 +715,6 @@ export default function RequestDetail() {
 
     return {
       label: status,
-      shortLabel: status,
       dotClass: 'bg-gray-300 border-gray-300 text-white',
       badgeClass: 'bg-gray-100 text-gray-600 border border-gray-200',
     }
@@ -998,6 +995,14 @@ export default function RequestDetail() {
                         String(request.client_id) === String(profile.id) &&
                         step.status === 'delivered'
 
+                      const canReviewThisStep =
+                        profile?.id &&
+                        step.status === 'completed' &&
+                        (String(request.client_id) === String(profile.id) ||
+                          String(step.creator_id) === String(profile.id))
+
+                      const selectedStepFile = selectedStepFiles[step.id]
+
                       return (
                         <div key={step.id} className="relative flex gap-5">
                           <div
@@ -1105,12 +1110,20 @@ export default function RequestDetail() {
 
                             {canDeliverThisStep && (
                               <div className="mt-5 p-5 bg-blue-50 border border-blue-100 rounded-2xl">
-                                <p className="font-medium text-blue-700 mb-3">
+                                <p className="font-medium text-blue-700 mb-2">
                                   この工程を納品する
                                 </p>
 
+                                <p className="text-sm text-blue-700 leading-7 mb-4">
+                                  完成ファイルを選択してから、納品ボタンを押してください。
+                                </p>
+
                                 <input
+                                  ref={(el) => {
+                                    stepFileInputRefs.current[step.id] = el
+                                  }}
                                   type="file"
+                                  className="hidden"
                                   onChange={(e) => {
                                     const file = e.target.files?.[0] || null
                                     setSelectedStepFiles((prev) => ({
@@ -1118,17 +1131,45 @@ export default function RequestDetail() {
                                       [step.id]: file,
                                     }))
                                   }}
-                                  className="w-full text-sm mb-4"
                                 />
+
+                                <div className="bg-white border border-blue-200 rounded-2xl p-4 mb-4">
+                                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                    <div>
+                                      <p className="text-xs text-gray-500 mb-1">
+                                        選択中のファイル
+                                      </p>
+                                      <p className="font-semibold text-gray-900 break-all">
+                                        {selectedStepFile
+                                          ? selectedStepFile.name
+                                          : 'まだファイルが選択されていません'}
+                                      </p>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => stepFileInputRefs.current[step.id]?.click()}
+                                      className="px-5 py-3 rounded-2xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium transition"
+                                    >
+                                      ファイルを選択する
+                                    </button>
+                                  </div>
+                                </div>
 
                                 <button
                                   onClick={() => handleDeliverStep(step)}
-                                  disabled={!selectedStepFiles[step.id] || uploadingStepId === step.id}
-                                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-4 rounded-2xl font-medium shadow-sm"
+                                  disabled={!selectedStepFile || uploadingStepId === step.id}
+                                  className={`w-full py-4 rounded-2xl font-medium shadow-sm transition ${
+                                    selectedStepFile && uploadingStepId !== step.id
+                                      ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                  }`}
                                 >
                                   {uploadingStepId === step.id
                                     ? 'アップロード中...'
-                                    : 'この工程を納品する'}
+                                    : selectedStepFile
+                                      ? 'この工程を納品する'
+                                      : 'ファイル選択後に納品できます'}
                                 </button>
                               </div>
                             )}
@@ -1170,6 +1211,17 @@ export default function RequestDetail() {
                             {step.status === 'completed' && (
                               <div className="mt-4 p-4 bg-green-50 border border-green-100 rounded-2xl text-sm text-green-700">
                                 この工程は完了しています。
+                              </div>
+                            )}
+
+                            {canReviewThisStep && (
+                              <div className="mt-5">
+                                <Link
+                                  href={`/request/${id}/review?step_id=${step.id}`}
+                                  className="block w-full text-center bg-yellow-500 hover:bg-yellow-600 text-white py-4 rounded-2xl font-medium shadow-sm transition"
+                                >
+                                  この工程を評価する
+                                </Link>
                               </div>
                             )}
                           </div>
@@ -1315,8 +1367,7 @@ export default function RequestDetail() {
             <div className="space-y-4 pt-6 border-t">
               {hasOrderSteps && (
                 <div className="p-5 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-600 leading-7">
-                  工程付き依頼です。工程ごとの受注・納品・検収が有効化されています。
-                  全工程が完了すると、依頼全体も自動的に完了になります。
+                  工程付き依頼です。工程ごとの受注・納品・検収・評価が有効化されています。
                 </div>
               )}
 
@@ -1330,21 +1381,49 @@ export default function RequestDetail() {
               )}
 
               {canDeliver && (
-                <div className="space-y-4">
-                  <p className="font-medium text-gray-700">納品ファイルをアップロード</p>
+                <div className="space-y-4 p-5 bg-blue-50 border border-blue-100 rounded-2xl">
+                  <p className="font-medium text-blue-700">納品ファイルをアップロード</p>
 
                   <input
+                    ref={generalFileInputRef}
                     type="file"
+                    className="hidden"
                     onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                    className="w-full text-sm"
                   />
+
+                  <div className="bg-white border border-blue-200 rounded-2xl p-4">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1">選択中のファイル</p>
+                        <p className="font-semibold text-gray-900 break-all">
+                          {selectedFile ? selectedFile.name : 'まだファイルが選択されていません'}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => generalFileInputRef.current?.click()}
+                        className="px-5 py-3 rounded-2xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium transition"
+                      >
+                        ファイルを選択する
+                      </button>
+                    </div>
+                  </div>
 
                   <button
                     onClick={handleDeliver}
                     disabled={!selectedFile || uploading}
-                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-5 rounded-2xl font-medium text-lg shadow-sm"
+                    className={`w-full py-5 rounded-2xl font-medium text-lg shadow-sm transition ${
+                      selectedFile && !uploading
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    }`}
                   >
-                    {uploading ? 'アップロード中...' : '納品する'}
+                    {uploading
+                      ? 'アップロード中...'
+                      : selectedFile
+                        ? '納品する'
+                        : 'ファイル選択後に納品できます'}
                   </button>
                 </div>
               )}
@@ -1358,7 +1437,7 @@ export default function RequestDetail() {
                 </button>
               )}
 
-              {canReview && (
+              {canReview && !hasOrderSteps && (
                 <button
                   onClick={() => router.push(`/request/${id}/review`)}
                   className="w-full bg-yellow-500 hover:bg-yellow-600 text-white py-5 rounded-2xl font-medium text-lg shadow-sm"
