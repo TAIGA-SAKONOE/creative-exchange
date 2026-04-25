@@ -1836,9 +1836,14 @@ export default function RequestDetail() {
                                                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                                                   <div className="min-w-0">
                                                     <div className="flex flex-wrap items-center gap-2 mb-2">
-                                                      <p className="font-bold text-gray-900">
+                                                      <a
+                                                        href={`/creator/${application.applicant_id}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="font-bold text-gray-900 hover:text-blue-600 hover:underline transition"
+                                                      >
                                                         {applicantName}
-                                                      </p>
+                                                      </a>
 
                                                       {applicantHandle && (
                                                         <span className="text-sm text-gray-500">
