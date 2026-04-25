@@ -190,6 +190,9 @@ function ExchangePageContent() {
   const [activeTab, setActiveTab] = useState<'requests' | 'creators' | 'listings'>(initialTab)
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null)
   const [acceptingStepId, setAcceptingStepId] = useState<string | null>(null)
+  const [applyingStepId, setApplyingStepId] = useState<string | null>(null)
+  const [stepApplicationMessages, setStepApplicationMessages] = useState<Record<string, string>>({})
+  const [appliedStepIds, setAppliedStepIds] = useState<string[]>([])
   const [buyingListingId, setBuyingListingId] = useState<string | null>(null)
   const [creatingConsultationCreatorId, setCreatingConsultationCreatorId] = useState<string | null>(null)
 
@@ -1049,7 +1052,7 @@ function ExchangePageContent() {
     }
   }
 
-  const handleAcceptStep = async (stepId: string) => {
+  const handleApplyStep = async (stepId: string) => {
     if (!currentUser?.id) {
       window.location.href = '/login'
       return
@@ -1069,7 +1072,7 @@ function ExchangePageContent() {
     }
 
     if (String(parentOrder.client_id) === String(currentUser.id)) {
-      alert('自分自身の依頼工程は受注できません')
+      alert('自分自身の依頼工程には応募できません')
       return
     }
 
@@ -1078,48 +1081,57 @@ function ExchangePageContent() {
       return
     }
 
+    if (appliedStepIds.includes(stepId)) {
+      alert('この工程にはすでに応募済みです')
+      return
+    }
+
+    const applicationMessage = stepApplicationMessages[stepId]?.trim() || ''
+
     const confirmed = window.confirm(
-      `「${parentOrder.title}」の工程「${targetStep.title}」を受注しますか？`
+      `「${parentOrder.title}」の工程「${targetStep.title}」に応募しますか？`
     )
 
     if (!confirmed) return
 
-    setAcceptingStepId(stepId)
+    setApplyingStepId(stepId)
 
     try {
       const supabase = createClient()
 
-      const { error: updateError } = await supabase
-        .from('order_steps')
-        .update({
-          creator_id: currentUser.id,
-          status: 'matched',
-          updated_at: new Date().toISOString(),
+      const { error: insertError } = await supabase
+        .from('order_step_applications')
+        .insert({
+          order_id: targetStep.order_id,
+          order_step_id: stepId,
+          applicant_id: currentUser.id,
+          message: applicationMessage || null,
+          status: 'pending',
         })
-        .eq('id', stepId)
-        .eq('status', 'open')
-        .is('creator_id', null)
 
-      if (updateError) {
-        alert('工程の受注に失敗しました: ' + updateError.message)
-        return
+      if (insertError) {
+        if (insertError.code === '23505') {
+          alert('この工程にはすでに応募済みです')
+          setAppliedStepIds((prev) => [...prev, stepId])
+          return
+        }
+        throw insertError
       }
 
       await supabase.from('notifications').insert({
         user_id: parentOrder.client_id,
-        type: 'order_step_matched',
-        title: '工程が受注されました',
-        body: `「${parentOrder.title}」の工程「${targetStep.title}」が受注されました。`,
+        type: 'order_step_application',
+        title: '工程に応募が届きました',
+        body: `「${parentOrder.title}」の工程「${targetStep.title}」に応募が届きました。`,
         link_url: `/request/${targetStep.order_id}`,
       })
 
-      alert('工程を受注しました')
-      router.push(`/request/${targetStep.order_id}`)
-      router.refresh()
+      setAppliedStepIds((prev) => [...prev, stepId])
+      alert('応募しました。依頼者からの連絡をお待ちください。')
     } catch (err: any) {
-      alert(err?.message || '工程受注処理中にエラーが発生しました')
+      alert(err?.message || '応募処理中にエラーが発生しました')
     } finally {
-      setAcceptingStepId(null)
+      setApplyingStepId(null)
     }
   }
 
@@ -1514,19 +1526,25 @@ function ExchangePageContent() {
 
                           <div className="space-y-3 mt-auto">
                             <button
-                              onClick={() => handleAcceptStep(step.id)}
-                              disabled={!!isOwnOrder || acceptingStepId === step.id}
+                              onClick={() => handleApplyStep(step.id)}
+                              disabled={!!isOwnOrder || applyingStepId === step.id || appliedStepIds.includes(step.id)}
                               className={`w-full py-4 rounded-2xl font-medium text-white shadow-sm transition ${
-                                isOwnOrder || acceptingStepId === step.id
+                                isOwnOrder
                                   ? 'bg-gray-400 cursor-not-allowed'
-                                  : 'bg-blue-600 hover:bg-blue-700'
+                                  : appliedStepIds.includes(step.id)
+                                    ? 'bg-green-500 cursor-not-allowed'
+                                    : applyingStepId === step.id
+                                      ? 'bg-gray-400 cursor-not-allowed'
+                                      : 'bg-blue-600 hover:bg-blue-700'
                               }`}
                             >
                               {isOwnOrder
                                 ? '自分の依頼工程です'
-                                : acceptingStepId === step.id
-                                  ? '受注中...'
-                                  : 'この工程を受注する'}
+                                : appliedStepIds.includes(step.id)
+                                  ? '応募済み ✓'
+                                  : applyingStepId === step.id
+                                    ? '応募中...'
+                                    : 'この工程に応募する'}
                             </button>
 
                             <Link
