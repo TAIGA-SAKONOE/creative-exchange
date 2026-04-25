@@ -2,7 +2,7 @@
 
 import { createClient } from '../../lib/supabase/client'
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import ProductMarketStatsCard from '../components/ProductMarketStatsCard'
 
@@ -74,6 +74,14 @@ type SellerMap = Record<
 
 export default function ExchangePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const initialTab =
+    searchParams.get('tab') === 'creators'
+      ? 'creators'
+      : searchParams.get('tab') === 'listings'
+        ? 'listings'
+        : 'requests'
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -85,7 +93,7 @@ export default function ExchangePage() {
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([])
   const [creatorCategoryMap, setCreatorCategoryMap] = useState<CreatorCategoryMap>({})
   const [sellerMap, setSellerMap] = useState<SellerMap>({})
-  const [activeTab, setActiveTab] = useState<'requests' | 'creators' | 'listings'>('requests')
+  const [activeTab, setActiveTab] = useState<'requests' | 'creators' | 'listings'>(initialTab)
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null)
   const [buyingListingId, setBuyingListingId] = useState<string | null>(null)
 
@@ -113,6 +121,18 @@ export default function ExchangePage() {
     max: number
   } | null>(null)
   const [listingMarketStatsLoading, setListingMarketStatsLoading] = useState(false)
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+
+    if (tabParam === 'creators') {
+      setActiveTab('creators')
+    } else if (tabParam === 'listings') {
+      setActiveTab('listings')
+    } else {
+      setActiveTab('requests')
+    }
+  }, [searchParams])
 
   useEffect(() => {
     const loadExchangePage = async () => {
@@ -782,8 +802,17 @@ export default function ExchangePage() {
                     カテゴリ・タイトル・説明文・予算から公開依頼を絞り込めます
                   </p>
                 </div>
-                <div className="text-sm text-gray-500">
-                  公開中 {filteredOrders.length} 件
+
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-gray-500">
+                    公開中 {filteredOrders.length} 件
+                  </span>
+                  <Link
+                    href="/request/new"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-2xl font-medium transition"
+                  >
+                    新しい依頼を作成
+                  </Link>
                 </div>
               </div>
 
