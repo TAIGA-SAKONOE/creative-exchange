@@ -154,6 +154,7 @@ function MarketPageContent() {
         })
 
         const parentSortOrder = new Map<string, number>()
+
         categories.forEach((category) => {
           const parent = category.parent_category || 'その他'
           const sortOrder = category.sort_order ?? 99
@@ -209,11 +210,14 @@ function MarketPageContent() {
             .from('user_categories')
             .select('category_id'),
 
+          // 注意：
+          // product_purchases には created_at カラムが存在しないため、
+          // 作品相場は現時点では全件ベースで集計する。
+          // 日付カラムを追加・確認できたら、後で直近90日フィルターを復活させる。
           supabase
             .from('product_purchases')
-            .select('category_id, price, created_at')
-            .gt('price', 0)
-            .gte('created_at', since.toISOString()),
+            .select('category_id, price')
+            .gt('price', 0),
         ])
 
         if (stepResult.error) throw stepResult.error
@@ -352,7 +356,8 @@ function MarketPageContent() {
             受託相場と作品相場の両方を確認できます
           </p>
           <p className="text-sm text-gray-400 mt-2">
-            直近{DAYS}日間の完了取引・販売実績をもとに算出しています
+            受託相場は直近{DAYS}日間の完了工程・旧単一依頼をもとに算出しています。
+            作品相場は現在、販売履歴全件をもとに算出しています。
           </p>
         </div>
 
@@ -401,7 +406,7 @@ function MarketPageContent() {
         )}
 
         <div className="mt-12 text-center text-sm text-gray-500">
-          ※ 相場は直近{DAYS}日間の実際の
+          ※ 相場は実際の
           {activeTab === 'requests' ? '完了工程・旧単一依頼' : '販売'}
           データに基づいています。
         </div>
