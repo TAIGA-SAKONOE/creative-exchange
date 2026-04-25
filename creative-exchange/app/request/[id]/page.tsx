@@ -3,7 +3,7 @@
 import LoadingState from '../../components/LoadingState'
 import MessageState from '../../components/MessageState'
 import { createClient } from '../../../lib/supabase/client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 
@@ -21,13 +21,28 @@ type OrderStep = {
   created_at: string | null
   updated_at: string | null
   categories?: { name: string } | { name: string }[] | null
-  users?: {
-    display_name: string | null
-    twitter_handle: string | null
-  } | {
-    display_name: string | null
-    twitter_handle: string | null
-  }[] | null
+  users?:
+    | {
+        display_name: string | null
+        twitter_handle: string | null
+      }
+    | {
+        display_name: string | null
+        twitter_handle: string | null
+      }[]
+    | null
+}
+
+type DeliverableFile = {
+  id: string
+  order_id: string
+  order_step_id: string | null
+  file_url: string
+  file_type: string | null
+  version: number | null
+  uploaded_at: string | null
+  note: string | null
+  signed_url?: string | null
 }
 
 export default function RequestDetail() {
@@ -36,15 +51,23 @@ export default function RequestDetail() {
 
   const [request, setRequest] = useState<any>(null)
   const [orderSteps, setOrderSteps] = useState<OrderStep[]>([])
-  const [deliverables, setDeliverables] = useState<any[]>([])
+  const [deliverables, setDeliverables] = useState<DeliverableFile[]>([])
   const [messages, setMessages] = useState<any[]>([])
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
   const [profile, setProfile] = useState<any>(null)
+
   const [uploading, setUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+
+  const [selectedStepFiles, setSelectedStepFiles] = useState<Record<string, File | null>>({})
+  const [uploadingStepId, setUploadingStepId] = useState<string | null>(null)
+
   const [messageText, setMessageText] = useState('')
   const [sendingMessage, setSendingMessage] = useState(false)
+
   const [cancelling, setCancelling] = useState(false)
 
   const router = useRouter()
@@ -105,6 +128,7 @@ export default function RequestDetail() {
       } = await supabase.auth.getUser()
 
       if (userError) throw userError
+
       if (!user) {
         router.replace('/login')
         return
@@ -199,7 +223,7 @@ export default function RequestDetail() {
           })
         )
 
-        setDeliverables(filesWithSignedUrls)
+        setDeliverables(filesWithSignedUrls as DeliverableFile[])
       }
 
       const { data: messageRows, error: messagesError } = await supabase
@@ -224,6 +248,7 @@ export default function RequestDetail() {
     if (!profile?.id || !request) return
 
     const supabase = createClient()
+
     const { error } = await supabase
       .from('orders')
       .update({
@@ -251,7 +276,7 @@ export default function RequestDetail() {
   }
 
   const handleDeliver = async () => {
-    if (!selectedFile || !profile?.id) return
+    if (!selectedFile || !profile?.id || !request) return
 
     setUploading(true)
     const supabase = createClient()
@@ -265,15 +290,14 @@ export default function RequestDetail() {
 
       if (uploadError) throw uploadError
 
-      const { error: insertError } = await supabase
-        .from('deliverables')
-        .insert({
-          order_id: id,
-          file_url: filePath,
-          file_type: selectedFile.type || null,
-          version: 1,
-          note: selectedFile.name,
-        })
+      const { error: insertError } = await supabase.from('deliverables').insert({
+        order_id: id,
+        order_step_id: null,
+        file_url: filePath,
+        file_type: selectedFile.type || null,
+        version: 1,
+        note: selectedFile.name,
+      })
 
       if (insertError) throw insertError
 
@@ -306,8 +330,90 @@ export default function RequestDetail() {
     }
   }
 
-  const handleComplete = async () => {
+  const handleDeliverStep = async (step: OrderStep) => {
+    if (!profile?.id || !request) return
+
+    const selectedStepFile = selectedStepFiles[step.id]
+
+    if (!selectedStepFile) {
+      alert('納品ファイルを選択してください')
+      return
+    }
+
+    if (String(step.creator_id) !== String(profile.id)) {
+      alert('この工程の担当クリエイターではありません')
+      return
+    }
+
+    if (step.status !== 'matched') {
+      alert('この工程は現在納品できる状態ではありません')
+      return
+    }
+
+    setUploadingStepId(step.id)
     const supabase = createClient()
+
+    try {
+      const safeFileName = selectedStepFile.name.replace(/[^\w.\-ぁ-んァ-ン一-龥ー]/g, '_')
+      const filePath = `${id}/steps/${step.id}/${Date.now()}_${safeFileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('deliverables')
+        .upload(filePath, selectedStepFile)
+
+      if (uploadError) throw uploadError
+
+      const { error: insertError } = await supabase.from('deliverables').insert({
+        order_id: id,
+        order_step_id: step.id,
+        file_url: filePath,
+        file_type: selectedStepFile.type || null,
+        version: 1,
+        note: selectedStepFile.name,
+      })
+
+      if (insertError) throw insertError
+
+      const { error: updateStepError } = await supabase
+        .from('order_steps')
+        .update({
+          status: 'delivered',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', step.id)
+        .eq('status', 'matched')
+        .eq('creator_id', profile.id)
+
+      if (updateStepError) throw updateStepError
+
+      await createNotification({
+        userId: request.client_id,
+        type: 'order_step_delivered',
+        title: '工程が納品されました',
+        body: `「${request.title}」の工程「${step.title}」に納品ファイルがアップロードされました。`,
+        linkUrl: `/request/${id}`,
+      })
+
+      alert('工程の納品が完了しました！')
+
+      setSelectedStepFiles((prev) => ({
+        ...prev,
+        [step.id]: null,
+      }))
+
+      loadData()
+    } catch (err: any) {
+      alert('工程納品に失敗しました: ' + err.message)
+    } finally {
+      setUploadingStepId(null)
+    }
+  }
+
+  const handleComplete = async () => {
+    if (!request) return
+
+    const supabase = createClient()
+
     const { error } = await supabase
       .from('orders')
       .update({
@@ -322,34 +428,34 @@ export default function RequestDetail() {
       return
     }
 
-    await createNotification({
-      userId: request.creator_id,
-      type: 'order_completed',
-      title: '取引が完了しました',
-      body: `「${request.title}」が検収完了になりました。`,
-      linkUrl: `/request/${id}`,
-    })
+    if (request.creator_id) {
+      await createNotification({
+        userId: request.creator_id,
+        type: 'order_completed',
+        title: '取引が完了しました',
+        body: `「${request.title}」が検収完了になりました。`,
+        linkUrl: `/request/${id}`,
+      })
+    }
 
     alert('取引が完了しました！')
     loadData()
   }
 
   const handleSendMessage = async () => {
-    if (!profile?.id) return
+    if (!profile?.id || !request) return
     if (!messageText.trim()) return
 
     setSendingMessage(true)
     const supabase = createClient()
 
     try {
-      const { error: insertError } = await supabase
-        .from('order_messages')
-        .insert({
-          order_id: id,
-          sender_user_id: profile.id,
-          sender_display_name: profile.display_name || '不明なユーザー',
-          message: messageText.trim(),
-        })
+      const { error: insertError } = await supabase.from('order_messages').insert({
+        order_id: id,
+        sender_user_id: profile.id,
+        sender_display_name: profile.display_name || '不明なユーザー',
+        message: messageText.trim(),
+      })
 
       if (insertError) throw insertError
 
@@ -393,6 +499,7 @@ export default function RequestDetail() {
 
     const reason = window.prompt('キャンセル理由を入力してください（必須）')
     if (reason === null) return
+
     if (!reason.trim()) {
       alert('キャンセル理由を入力してください')
       return
@@ -518,7 +625,6 @@ export default function RequestDetail() {
         shortLabel: '募集中',
         dotClass: 'bg-blue-600 border-blue-600 text-white',
         badgeClass: 'bg-blue-50 text-blue-700 border border-blue-100',
-        lineClass: 'bg-blue-200',
       }
     }
 
@@ -528,7 +634,6 @@ export default function RequestDetail() {
         shortLabel: '制作中',
         dotClass: 'bg-purple-600 border-purple-600 text-white',
         badgeClass: 'bg-purple-50 text-purple-700 border border-purple-100',
-        lineClass: 'bg-purple-200',
       }
     }
 
@@ -538,7 +643,6 @@ export default function RequestDetail() {
         shortLabel: '納品',
         dotClass: 'bg-orange-500 border-orange-500 text-white',
         badgeClass: 'bg-orange-50 text-orange-700 border border-orange-100',
-        lineClass: 'bg-orange-200',
       }
     }
 
@@ -548,7 +652,6 @@ export default function RequestDetail() {
         shortLabel: '完了',
         dotClass: 'bg-green-600 border-green-600 text-white',
         badgeClass: 'bg-green-50 text-green-700 border border-green-100',
-        lineClass: 'bg-green-200',
       }
     }
 
@@ -558,7 +661,6 @@ export default function RequestDetail() {
         shortLabel: '中止',
         dotClass: 'bg-gray-400 border-gray-400 text-white',
         badgeClass: 'bg-gray-100 text-gray-600 border border-gray-200',
-        lineClass: 'bg-gray-200',
       }
     }
 
@@ -567,7 +669,6 @@ export default function RequestDetail() {
       shortLabel: status,
       dotClass: 'bg-gray-300 border-gray-300 text-white',
       badgeClass: 'bg-gray-100 text-gray-600 border border-gray-200',
-      lineClass: 'bg-gray-200',
     }
   }
 
@@ -578,6 +679,14 @@ export default function RequestDetail() {
     if (Number.isNaN(date.getTime())) return dateString
 
     return date.toLocaleDateString('ja-JP')
+  }
+
+  const getStepDeliverables = (stepId: string) => {
+    return deliverables.filter((file) => file.order_step_id === stepId)
+  }
+
+  const getGeneralDeliverables = () => {
+    return deliverables.filter((file) => !file.order_step_id)
   }
 
   if (loading) {
@@ -650,7 +759,7 @@ export default function RequestDetail() {
   const canEdit = isClient && ['draft', 'open'].includes(request.status)
 
   const canCancel =
-    (isClient || isCreator) &&
+    (isClient || isCreator || isStepCreator) &&
     ['open', 'matched', 'in_progress', 'revision'].includes(request.status)
 
   const statusLabel =
@@ -675,6 +784,8 @@ export default function RequestDetail() {
                   : request.status === 'cancelled'
                     ? 'キャンセル'
                     : request.status
+
+  const generalDeliverables = getGeneralDeliverables()
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -792,18 +903,22 @@ export default function RequestDetail() {
                     <p className="text-xs text-blue-600 mb-1">募集中</p>
                     <p className="text-2xl font-bold text-blue-700">{openSteps}</p>
                   </div>
+
                   <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4">
                     <p className="text-xs text-purple-600 mb-1">制作中</p>
                     <p className="text-2xl font-bold text-purple-700">{matchedSteps}</p>
                   </div>
+
                   <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4">
                     <p className="text-xs text-orange-600 mb-1">納品済み</p>
                     <p className="text-2xl font-bold text-orange-700">{deliveredSteps}</p>
                   </div>
+
                   <div className="bg-green-50 border border-green-100 rounded-2xl p-4">
                     <p className="text-xs text-green-600 mb-1">完了</p>
                     <p className="text-2xl font-bold text-green-700">{completedSteps}</p>
                   </div>
+
                   <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
                     <p className="text-xs text-gray-500 mb-1">キャンセル</p>
                     <p className="text-2xl font-bold text-gray-600">{cancelledSteps}</p>
@@ -814,10 +929,15 @@ export default function RequestDetail() {
                   <div className="absolute left-5 top-8 bottom-8 w-0.5 bg-gray-200" />
 
                   <div className="space-y-6">
-                    {orderSteps.map((step, index) => {
+                    {orderSteps.map((step) => {
                       const statusMeta = getStepStatusMeta(step.status)
                       const creatorName = getStepCreatorName(step)
                       const deadlineLabel = formatDate(step.deadline)
+                      const stepDeliverables = getStepDeliverables(step.id)
+                      const canDeliverThisStep =
+                        profile?.id &&
+                        String(step.creator_id) === String(profile.id) &&
+                        step.status === 'matched'
 
                       return (
                         <div key={step.id} className="relative flex gap-5">
@@ -838,11 +958,13 @@ export default function RequestDetail() {
                                   <span className="text-sm text-gray-500">
                                     工程{step.step_number}
                                   </span>
+
                                   <span
                                     className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${statusMeta.badgeClass}`}
                                   >
                                     {statusMeta.label}
                                   </span>
+
                                   <span className="inline-flex px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium border border-blue-100">
                                     {getStepCategoryName(step)}
                                   </span>
@@ -869,7 +991,7 @@ export default function RequestDetail() {
                               </p>
                             )}
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-4">
                               <div className="bg-gray-50 rounded-2xl p-4">
                                 <p className="text-gray-500 mb-1">担当クリエイター</p>
                                 <p className="font-semibold text-gray-900">
@@ -885,9 +1007,88 @@ export default function RequestDetail() {
                               </div>
                             </div>
 
+                            {stepDeliverables.length > 0 && (
+                              <div className="mb-4">
+                                <p className="text-sm text-gray-500 mb-3">この工程の納品ファイル</p>
+
+                                <div className="space-y-2">
+                                  {stepDeliverables.map((file) => (
+                                    <a
+                                      key={file.id}
+                                      href={file.signed_url || '#'}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-3 p-4 bg-orange-50 hover:bg-orange-100 rounded-2xl transition border border-orange-100"
+                                      onClick={(e) => {
+                                        if (!file.signed_url) {
+                                          e.preventDefault()
+                                          alert('納品ファイルの表示URLを作成できませんでした')
+                                        }
+                                      }}
+                                    >
+                                      <div className="text-2xl">📎</div>
+
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-medium truncate">
+                                          {file.note || '納品ファイル'}
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                          {file.uploaded_at
+                                            ? new Date(file.uploaded_at).toLocaleString('ja-JP')
+                                            : ''}
+                                        </p>
+                                      </div>
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {canDeliverThisStep && (
+                              <div className="mt-5 p-5 bg-blue-50 border border-blue-100 rounded-2xl">
+                                <p className="font-medium text-blue-700 mb-3">
+                                  この工程を納品する
+                                </p>
+
+                                <input
+                                  type="file"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0] || null
+                                    setSelectedStepFiles((prev) => ({
+                                      ...prev,
+                                      [step.id]: file,
+                                    }))
+                                  }}
+                                  className="w-full text-sm mb-4"
+                                />
+
+                                <button
+                                  onClick={() => handleDeliverStep(step)}
+                                  disabled={!selectedStepFiles[step.id] || uploadingStepId === step.id}
+                                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-4 rounded-2xl font-medium shadow-sm"
+                                >
+                                  {uploadingStepId === step.id
+                                    ? 'アップロード中...'
+                                    : 'この工程を納品する'}
+                                </button>
+                              </div>
+                            )}
+
                             {step.status === 'open' && (
                               <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-2xl text-sm text-blue-700">
-                                この工程はまだ募集中です。工程単位の受注は次フェーズで有効化します。
+                                この工程はまだ募集中です。
+                              </div>
+                            )}
+
+                            {step.status === 'delivered' && (
+                              <div className="mt-4 p-4 bg-orange-50 border border-orange-100 rounded-2xl text-sm text-orange-700">
+                                この工程は納品済みです。依頼者の検収待ちです。
+                              </div>
+                            )}
+
+                            {step.status === 'completed' && (
+                              <div className="mt-4 p-4 bg-green-50 border border-green-100 rounded-2xl text-sm text-green-700">
+                                この工程は完了しています。
                               </div>
                             )}
                           </div>
@@ -916,45 +1117,48 @@ export default function RequestDetail() {
               </div>
             )}
 
-            <div className="mb-10">
-              <p className="text-sm text-gray-500 mb-4">納品ファイル</p>
+            {!hasOrderSteps && (
+              <div className="mb-10">
+                <p className="text-sm text-gray-500 mb-4">納品ファイル</p>
 
-              {deliverables.length > 0 ? (
-                <div className="space-y-3">
-                  {deliverables.map((file: any) => (
-                    <a
-                      key={file.id}
-                      href={file.signed_url || '#'}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-4 p-5 bg-gray-50 hover:bg-gray-100 rounded-2xl transition group"
-                      onClick={(e) => {
-                        if (!file.signed_url) {
-                          e.preventDefault()
-                          alert('納品ファイルの表示URLを作成できませんでした')
-                        }
-                      }}
-                    >
-                      <div className="text-3xl">📎</div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">
-                          {file.note || '納品ファイル'}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {file.uploaded_at
-                            ? new Date(file.uploaded_at).toLocaleDateString('ja-JP')
-                            : ''}
-                        </p>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-5 bg-gray-50 rounded-2xl text-gray-500 text-sm">
-                  まだ納品ファイルはありません
-                </div>
-              )}
-            </div>
+                {generalDeliverables.length > 0 ? (
+                  <div className="space-y-3">
+                    {generalDeliverables.map((file) => (
+                      <a
+                        key={file.id}
+                        href={file.signed_url || '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-4 p-5 bg-gray-50 hover:bg-gray-100 rounded-2xl transition group"
+                        onClick={(e) => {
+                          if (!file.signed_url) {
+                            e.preventDefault()
+                            alert('納品ファイルの表示URLを作成できませんでした')
+                          }
+                        }}
+                      >
+                        <div className="text-3xl">📎</div>
+
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">
+                            {file.note || '納品ファイル'}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {file.uploaded_at
+                              ? new Date(file.uploaded_at).toLocaleDateString('ja-JP')
+                              : ''}
+                          </p>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-5 bg-gray-50 rounded-2xl text-gray-500 text-sm">
+                    まだ納品ファイルはありません
+                  </div>
+                )}
+              </div>
+            )}
 
             {canMessage && (
               <div className="mb-10">
@@ -993,6 +1197,7 @@ export default function RequestDetail() {
                                 : ''}
                             </p>
                           </div>
+
                           <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
                             {msg.message}
                           </p>
@@ -1014,6 +1219,7 @@ export default function RequestDetail() {
                     className="w-full px-4 py-3 border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-200 resize-y"
                     placeholder="依頼に関するメッセージを入力してください"
                   />
+
                   <button
                     onClick={handleSendMessage}
                     disabled={!messageText.trim() || sendingMessage}
@@ -1028,7 +1234,8 @@ export default function RequestDetail() {
             <div className="space-y-4 pt-6 border-t">
               {hasOrderSteps && (
                 <div className="p-5 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-600 leading-7">
-                  工程付き依頼です。工程ごとの受注・納品・検収は次フェーズで有効化します。
+                  工程付き依頼です。工程ごとの納品まで有効化されています。
+                  工程ごとの検収は次フェーズで実装します。
                 </div>
               )}
 
@@ -1044,11 +1251,13 @@ export default function RequestDetail() {
               {canDeliver && (
                 <div className="space-y-4">
                   <p className="font-medium text-gray-700">納品ファイルをアップロード</p>
+
                   <input
                     type="file"
                     onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                     className="w-full text-sm"
                   />
+
                   <button
                     onClick={handleDeliver}
                     disabled={!selectedFile || uploading}
