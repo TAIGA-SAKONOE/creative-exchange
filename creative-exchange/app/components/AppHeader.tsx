@@ -8,25 +8,69 @@ import { useEffect, useState } from 'react'
 export default function AppHeader() {
   const router = useRouter()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
   const [exchangeOpen, setExchangeOpen] = useState(false)
   const [marketOpen, setMarketOpen] = useState(false)
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+  const loadUnreadNotifications = async () => {
+    const supabase = createClient()
 
-      setIsLoggedIn(!!user)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    setIsLoggedIn(!!user)
+
+    if (!user) {
+      setUnreadCount(0)
+      return
     }
 
-    checkAuth()
+    const { data: profile, error: profileError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('auth_id', user.id)
+      .single()
+
+    if (profileError || !profile) {
+      setUnreadCount(0)
+      return
+    }
+
+    const { count, error: countError } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', profile.id)
+      .eq('is_read', false)
+
+    if (countError) {
+      console.error('unread notification count error:', countError)
+      setUnreadCount(0)
+      return
+    }
+
+    setUnreadCount(count || 0)
+  }
+
+  useEffect(() => {
+    loadUnreadNotifications()
+
+    const handleFocus = () => {
+      loadUnreadNotifications()
+    }
+
+    window.addEventListener('focus', handleFocus)
+
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+    }
   }, [])
 
   const handleLogout = async () => {
     const supabase = createClient()
     await supabase.auth.signOut()
+    setIsLoggedIn(false)
+    setUnreadCount(0)
     router.replace('/login')
   }
 
@@ -93,7 +137,7 @@ export default function AppHeader() {
                         onClick={closeDropdowns}
                         className="block px-4 py-3 rounded-xl hover:bg-gray-100 transition"
                       >
-                        人を探す
+                        クリエイターを探す
                       </Link>
 
                       <Link
@@ -181,9 +225,15 @@ export default function AppHeader() {
                 <Link
                   href="/mypage"
                   onClick={closeDropdowns}
-                  className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-left md:text-center"
+                  className="relative px-3 py-2 rounded-xl hover:bg-gray-100 transition text-left md:text-center inline-flex items-center gap-2"
                 >
-                  マイページ
+                  <span>マイページ</span>
+
+                  {unreadCount > 0 && (
+                    <span className="inline-flex min-w-5 h-5 px-1.5 items-center justify-center rounded-full bg-red-600 text-white text-xs font-bold leading-none">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
                 </Link>
               )}
 
