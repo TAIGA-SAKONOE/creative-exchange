@@ -40,6 +40,7 @@ type RequestStepInput = {
   category_id: string
   budget: string
   deadline: string
+  parallel_group: string
   named_creator: CreatorOption | null
   creator_search: string
   creator_candidates: CreatorOption[]
@@ -53,6 +54,7 @@ const createEmptyStep = (index: number): RequestStepInput => ({
   category_id: '',
   budget: '',
   deadline: '',
+  parallel_group: '',
   named_creator: null,
   creator_search: '',
   creator_candidates: [],
@@ -383,6 +385,18 @@ function NewRequestContent() {
         }
       }
 
+      if (step.parallel_group.trim() !== '') {
+        const groupValue = Number(step.parallel_group)
+        if (
+          !Number.isInteger(groupValue) ||
+          groupValue < 1 ||
+          groupValue > 5
+        ) {
+          alert(`${label}の並行グループは1〜5の範囲で選択してください`)
+          return false
+        }
+      }
+
       if (isNamedRequest && !step.named_creator?.id) {
         alert(`${label}の指名クリエイターを選択してください`)
         return false
@@ -455,7 +469,9 @@ function NewRequestContent() {
       if (!profile) throw new Error('ユーザー情報が見つかりません')
 
       const selfAssignedStep = steps.find(
-        (step) => step.named_creator?.id && String(step.named_creator.id) === String(profile.id)
+        (step) =>
+          step.named_creator?.id &&
+          String(step.named_creator.id) === String(profile.id)
       )
 
       if (selfAssignedStep) {
@@ -464,6 +480,9 @@ function NewRequestContent() {
 
       const normalizedSteps = steps.map((step, index) => {
         const budgetValue = step.budget ? Number(step.budget) : 0
+        const parallelGroupValue = step.parallel_group
+          ? Number(step.parallel_group)
+          : null
 
         return {
           step_number: index + 1,
@@ -472,6 +491,10 @@ function NewRequestContent() {
           required_category_id: parseInt(step.category_id, 10),
           budget: Number.isFinite(budgetValue) ? budgetValue : 0,
           deadline: step.deadline || null,
+          parallel_group:
+            parallelGroupValue !== null && Number.isFinite(parallelGroupValue)
+              ? parallelGroupValue
+              : null,
           creator_id: isNamedRequest ? step.named_creator?.id || null : null,
           status: isNamedRequest ? 'matched' : 'open',
         }
@@ -506,7 +529,7 @@ function NewRequestContent() {
             note: isNamedRequest ? '指名依頼' : '公開依頼',
             request_type: requestType,
             initial_named_creator_id: initialNamedCreator?.id || null,
-            phase: 'G-1',
+            phase: 'G-2',
             workflow: 'order_steps',
           },
 
@@ -531,6 +554,7 @@ function NewRequestContent() {
         required_category_id: step.required_category_id,
         budget: step.budget,
         deadline: step.deadline,
+        parallel_group: step.parallel_group,
         creator_id: step.creator_id,
         status: step.status,
       }))
@@ -827,6 +851,29 @@ function NewRequestContent() {
                         />
                       </div>
 
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          並行グループ
+                        </label>
+                        <select
+                          value={step.parallel_group}
+                          onChange={(e) =>
+                            updateStep(index, 'parallel_group', e.target.value)
+                          }
+                          className="w-full p-4 border border-gray-300 rounded-2xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        >
+                          <option value="">未設定（通常工程）</option>
+                          <option value="1">グループ1</option>
+                          <option value="2">グループ2</option>
+                          <option value="3">グループ3</option>
+                          <option value="4">グループ4</option>
+                          <option value="5">グループ5</option>
+                        </select>
+                        <p className="mt-2 text-xs text-gray-500 leading-5">
+                          同じ番号の工程は、同時並行で進められる工程として表示します。
+                        </p>
+                      </div>
+
                       {isNamedRequest && (
                         <div className="md:col-span-2 relative">
                           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1012,6 +1059,13 @@ function NewRequestContent() {
                   <div className="mt-4 text-sm">
                     <p className="text-gray-500 mb-1">最終納期</p>
                     <p className="font-bold">{latestDeadline}</p>
+                  </div>
+                )}
+
+                {steps.some((step) => step.parallel_group) && (
+                  <div className="mt-5 p-4 bg-purple-50 border border-purple-200 rounded-2xl text-sm text-purple-800 leading-7">
+                    並行グループが設定されています。同じグループ番号の工程は、
+                    依頼詳細画面で並行可能な工程としてまとめて表示されます。
                   </div>
                 )}
 
