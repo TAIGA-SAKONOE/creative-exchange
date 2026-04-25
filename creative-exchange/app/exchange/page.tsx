@@ -1,7 +1,7 @@
 'use client'
 
 import { createClient } from '../../lib/supabase/client'
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import ProductMarketStatsCard from '../components/ProductMarketStatsCard'
@@ -145,6 +145,9 @@ function ExchangePageContent() {
   const [creatorCategoryId, setCreatorCategoryId] = useState('')
   const [creatorParentCategory, setCreatorParentCategory] = useState('')
   const [creatorSkillTagKeyword, setCreatorSkillTagKeyword] = useState('')
+  const [creatorSkillTagDropdownOpen, setCreatorSkillTagDropdownOpen] = useState(false)
+  const creatorSkillTagSearchRef = useRef<HTMLDivElement | null>(null)
+
   const [creatorNameKeyword, setCreatorNameKeyword] = useState('')
   const [creatorBioKeyword, setCreatorBioKeyword] = useState('')
   const [creatorSkillKeyword, setCreatorSkillKeyword] = useState('')
@@ -174,6 +177,23 @@ function ExchangePageContent() {
       setActiveTab('requests')
     }
   }, [searchParams])
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        creatorSkillTagSearchRef.current &&
+        !creatorSkillTagSearchRef.current.contains(event.target as Node)
+      ) {
+        setCreatorSkillTagDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
 
   useEffect(() => {
     const loadExchangePage = async () => {
@@ -442,12 +462,14 @@ function ExchangePageContent() {
           }
 
           const nextSellerMap: SellerMap = {}
+
           ;(sellerRows || []).forEach((seller: any) => {
             nextSellerMap[seller.id] = {
               display_name: seller.display_name || null,
               twitter_handle: seller.twitter_handle || null,
             }
           })
+
           setSellerMap(nextSellerMap)
         }
       } catch (err: any) {
@@ -610,13 +632,23 @@ function ExchangePageContent() {
     loadListingMarketStats(listingCategoryId)
   }, [listingCategoryId])
 
-  const skillTagDatalistOptions = useMemo(() => {
+  const filteredSkillTagSuggestions = useMemo(() => {
+    const keyword = creatorSkillTagKeyword.trim().toLowerCase()
+
     const parentFiltered = creatorParentCategory
-      ? allSkillTags.filter((tag) => (tag.parent_category || 'その他') === creatorParentCategory)
+      ? allSkillTags.filter(
+          (tag) => (tag.parent_category || 'その他') === creatorParentCategory
+        )
       : allSkillTags
 
-    return parentFiltered.map((tag) => tag.name)
-  }, [allSkillTags, creatorParentCategory])
+    if (!keyword) {
+      return parentFiltered.slice(0, 20)
+    }
+
+    return parentFiltered
+      .filter((tag) => tag.name.toLowerCase().includes(keyword))
+      .slice(0, 20)
+  }, [allSkillTags, creatorParentCategory, creatorSkillTagKeyword])
 
   const filteredOrders = useMemo(() => {
     const parsedMinBudget = minBudget.trim() === '' ? null : Number(minBudget)
@@ -1399,7 +1431,11 @@ function ExchangePageContent() {
                   </label>
                   <select
                     value={creatorParentCategory}
-                    onChange={(e) => setCreatorParentCategory(e.target.value)}
+                    onChange={(e) => {
+                      setCreatorParentCategory(e.target.value)
+                      setCreatorSkillTagKeyword('')
+                      setCreatorSkillTagDropdownOpen(false)
+                    }}
                     className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200 bg-white"
                   >
                     <option value="">すべて</option>
@@ -1411,23 +1447,62 @@ function ExchangePageContent() {
                   </select>
                 </div>
 
-                <div>
+                <div className="relative" ref={creatorSkillTagSearchRef}>
                   <label className="block text-sm font-medium text-gray-600 mb-2">
                     サブカテゴリ
                   </label>
+
                   <input
                     type="text"
                     value={creatorSkillTagKeyword}
-                    onChange={(e) => setCreatorSkillTagKeyword(e.target.value)}
+                    onFocus={() => setCreatorSkillTagDropdownOpen(true)}
+                    onChange={(e) => {
+                      setCreatorSkillTagKeyword(e.target.value)
+                      setCreatorSkillTagDropdownOpen(true)
+                    }}
                     placeholder="例: ボカロ曲"
-                    list="skill-tag-filter-options"
-                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
+                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 pr-10 outline-none focus:ring-2 focus:ring-blue-200"
                   />
-                  <datalist id="skill-tag-filter-options">
-                    {skillTagDatalistOptions.map((name) => (
-                      <option key={name} value={name} />
-                    ))}
-                  </datalist>
+
+                  {creatorSkillTagKeyword && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreatorSkillTagKeyword('')
+                        setCreatorSkillTagDropdownOpen(false)
+                      }}
+                      className="absolute right-4 top-[44px] text-gray-400 hover:text-gray-700 text-sm"
+                    >
+                      ×
+                    </button>
+                  )}
+
+                  {creatorSkillTagDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 max-h-72 overflow-y-auto p-2">
+                      {filteredSkillTagSuggestions.length > 0 ? (
+                        filteredSkillTagSuggestions.map((tag) => (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => {
+                              setCreatorSkillTagKeyword(tag.name)
+                              setCreatorSkillTagDropdownOpen(false)
+                            }}
+                            className="w-full text-left px-4 py-3 rounded-xl hover:bg-blue-50 transition"
+                          >
+                            <div className="font-medium text-gray-900">{tag.name}</div>
+                            <div className="text-xs text-gray-500">
+                              {tag.parent_category || 'その他'}
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-4 text-sm text-gray-500">
+                          該当するタグがありません
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div>
