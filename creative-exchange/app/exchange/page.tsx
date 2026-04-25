@@ -82,6 +82,13 @@ type ListingItem = {
 type CategoryOption = {
   id: number
   name: string
+  parent_category: string | null
+  sort_order: number | null
+}
+
+type CategoryGroup = {
+  parentCategory: string
+  items: CategoryOption[]
 }
 
 type SkillTag = {
@@ -117,6 +124,25 @@ type SellerMap = Record<
 >
 
 const PARENT_CATEGORIES = ['音楽', 'イラスト', '動画', '文章', 'その他']
+
+const groupCategoriesByParent = (categories: CategoryOption[]): CategoryGroup[] => {
+  const grouped = new Map<string, CategoryOption[]>()
+
+  categories.forEach((category) => {
+    const parent = category.parent_category || 'その他'
+
+    if (!grouped.has(parent)) {
+      grouped.set(parent, [])
+    }
+
+    grouped.get(parent)!.push(category)
+  })
+
+  return Array.from(grouped.entries()).map(([parentCategory, items]) => ({
+    parentCategory,
+    items: items.sort((a, b) => a.name.localeCompare(b.name, 'ja')),
+  }))
+}
 
 export default function ExchangePage() {
   return (
@@ -269,7 +295,9 @@ function ExchangePageContent() {
 
       const { data: categoryRows, error: categoriesError } = await supabase
         .from('categories')
-        .select('id, name')
+        .select('id, name, parent_category, sort_order')
+        .order('sort_order', { ascending: true })
+        .order('parent_category', { ascending: true })
         .order('name', { ascending: true })
 
       if (categoriesError) {
@@ -730,6 +758,10 @@ function ExchangePageContent() {
       .filter((tag) => tag.name.toLowerCase().includes(keyword))
       .slice(0, 20)
   }, [allSkillTags, creatorParentCategory, creatorSkillTagKeyword])
+
+  const groupedCategoryOptions = useMemo(() => {
+    return groupCategoriesByParent(categoryOptions)
+  }, [categoryOptions])
 
   const orderIdsWithOpenSteps = useMemo(() => {
     return new Set(openOrderSteps.map((step) => step.order_id))
@@ -1743,10 +1775,14 @@ function ExchangePageContent() {
                     className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200 bg-white"
                   >
                     <option value="">すべて</option>
-                    {categoryOptions.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
+                    {groupedCategoryOptions.map((group) => (
+                      <optgroup key={group.parentCategory} label={group.parentCategory}>
+                        {group.items.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                 </div>
