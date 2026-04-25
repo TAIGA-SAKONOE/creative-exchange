@@ -368,15 +368,24 @@ export default function RequestDetail() {
     }
 
     const existingApplication = getMyApplicationForStep(step.id)
+    const applicationMessage = applicationMessages[step.id]?.trim() || ''
 
-    if (existingApplication) {
-      alert('この工程にはすでに応募済みです')
+    if (existingApplication?.status === 'pending') {
+      alert('この工程にはすでに応募中です')
       return
     }
 
-    const applicationMessage = applicationMessages[step.id]?.trim() || ''
+    if (existingApplication?.status === 'accepted') {
+      alert('この工程にはすでに採用されています')
+      return
+    }
 
-    const confirmed = window.confirm(`工程「${step.title}」に応募しますか？`)
+    const confirmed = window.confirm(
+      existingApplication
+        ? `工程「${step.title}」に再応募しますか？`
+        : `工程「${step.title}」に応募しますか？`
+    )
+
     if (!confirmed) return
 
     setApplyingStepId(step.id)
@@ -384,22 +393,39 @@ export default function RequestDetail() {
     try {
       const supabase = createClient()
 
-      const { error: insertError } = await supabase
-        .from('order_step_applications')
-        .insert({
-          order_id: id,
-          order_step_id: step.id,
-          applicant_id: profile.id,
-          message: applicationMessage || null,
-          status: 'pending',
-        })
+      if (
+        existingApplication &&
+        ['cancelled', 'rejected'].includes(existingApplication.status)
+      ) {
+        const { error: updateError } = await supabase
+          .from('order_step_applications')
+          .update({
+            message: applicationMessage || null,
+            status: 'pending',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingApplication.id)
+          .eq('applicant_id', profile.id)
 
-      if (insertError) throw insertError
+        if (updateError) throw updateError
+      } else {
+        const { error: insertError } = await supabase
+          .from('order_step_applications')
+          .insert({
+            order_id: id,
+            order_step_id: step.id,
+            applicant_id: profile.id,
+            message: applicationMessage || null,
+            status: 'pending',
+          })
+
+        if (insertError) throw insertError
+      }
 
       await createNotification({
         userId: request.client_id,
-        type: 'order_step_application',
-        title: '工程に応募が届きました',
+        type: existingApplication ? 'order_step_reapplication' : 'order_step_application',
+        title: existingApplication ? '工程に再応募が届きました' : '工程に応募が届きました',
         body: `「${request.title}」の工程「${step.title}」に応募が届きました。`,
         linkUrl: `/request/${id}`,
       })
@@ -409,14 +435,68 @@ export default function RequestDetail() {
         [step.id]: '',
       }))
 
-      alert('工程に応募しました')
+      alert(existingApplication ? '工程に再応募しました' : '工程に応募しました')
       loadData()
     } catch (err: any) {
-      if (String(err.message || '').includes('duplicate')) {
-        alert('この工程にはすでに応募済みです')
-      } else {
-        alert('応募に失敗しました: ' + err.message)
-      }
+      alert('応募に失敗しました: ' + err.message)
+    } finally {
+      setApplyingStepId(null)
+    }
+  }
+
+  const handleCancelApplication = async (step: OrderStep, application: StepApplication) => {
+    if (!profile?.id || !request) return
+
+    if (String(application.applicant_id) !== String(profile.id)) {
+      alert('応募者本人のみ取り下げできます')
+      return
+    }
+
+    if (application.status !== 'pending') {
+      alert('この応募は現在取り下げできません')
+      return
+    }
+
+    if (step.status !== 'open') {
+      alert('この工程は現在応募取り下げできません')
+      return
+    }
+
+    const confirmed = window.confirm(
+      `工程「${step.title}」への応募を取り下げますか？`
+    )
+
+    if (!confirmed) return
+
+    setApplyingStepId(step.id)
+
+    try {
+      const supabase = createClient()
+
+      const { error } = await supabase
+        .from('order_step_applications')
+        .update({
+          status: 'cancelled',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', application.id)
+        .eq('applicant_id', profile.id)
+        .eq('status', 'pending')
+
+      if (error) throw error
+
+      await createNotification({
+        userId: request.client_id,
+        type: 'order_step_application_cancelled',
+        title: '工程への応募が取り下げられました',
+        body: `「${request.title}」の工程「${step.title}」への応募が取り下げられました。`,
+        linkUrl: `/request/${id}`,
+      })
+
+      alert('応募を取り下げました')
+      loadData()
+    } catch (err: any) {
+      alert('応募取り下げに失敗しました: ' + err.message)
     } finally {
       setApplyingStepId(null)
     }
@@ -1514,7 +1594,17 @@ export default function RequestDetail() {
                               profile?.id &&
                               !isClient &&
                               step.status === 'open' &&
-                              !myApplication
+                              (
+                                !myApplication ||
+                                myApplication.status === 'cancelled' ||
+                                myApplication.status === 'rejected'
+                              )
+
+                            const canCancelMyApplication =
+                              profile?.id &&
+                              !isClient &&
+                              step.status === 'open' &&
+                              myApplication?.status === 'pending'
 
                             const canDeliverThisStep =
                               profile?.id &&
@@ -1713,11 +1803,13 @@ export default function RequestDetail() {
                                   {canApplyThisStep && (
                                     <div className="mt-5 p-5 bg-blue-50 border border-blue-100 rounded-2xl">
                                       <p className="font-medium text-blue-700 mb-2">
-                                        この工程に応募する
+                                        {myApplication ? 'この工程に再応募する' : 'この工程に応募する'}
                                       </p>
 
                                       <p className="text-sm text-blue-700 leading-7 mb-4">
-                                        依頼者が応募内容を確認し、採用するとこの工程の担当者になります。
+                                        {myApplication
+                                          ? '以前の応募内容を更新して、もう一度応募できます。'
+                                          : '依頼者が応募内容を確認し、採用するとこの工程の担当者になります。'}
                                       </p>
 
                                       <textarea
@@ -1740,7 +1832,9 @@ export default function RequestDetail() {
                                       >
                                         {applyingStepId === step.id
                                           ? '応募中...'
-                                          : 'この工程に応募する'}
+                                          : myApplication
+                                            ? 'この工程に再応募する'
+                                            : 'この工程に応募する'}
                                       </button>
                                     </div>
                                   )}
@@ -1749,7 +1843,13 @@ export default function RequestDetail() {
                                     <div className="mt-5 p-4 bg-yellow-50 border border-yellow-100 rounded-2xl">
                                       <div className="flex flex-wrap items-center gap-2 mb-2">
                                         <p className="font-medium text-yellow-800">
-                                          この工程に応募済みです
+                                          {myApplication.status === 'pending'
+                                            ? 'この工程に応募中です'
+                                            : myApplication.status === 'accepted'
+                                              ? 'この工程に採用済みです'
+                                              : myApplication.status === 'rejected'
+                                                ? 'この工程は不採用になりました'
+                                                : 'この工程への応募は取り下げ・解除済みです'}
                                         </p>
 
                                         <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getApplicationStatusMeta(myApplication.status).className}`}>
@@ -1760,6 +1860,24 @@ export default function RequestDetail() {
                                       {myApplication.message && (
                                         <p className="text-sm text-yellow-800 whitespace-pre-wrap leading-6">
                                           {myApplication.message}
+                                        </p>
+                                      )}
+
+                                      {canCancelMyApplication && (
+                                        <button
+                                          onClick={() => handleCancelApplication(step, myApplication)}
+                                          disabled={applyingStepId === step.id}
+                                          className="mt-4 w-full border border-yellow-300 hover:bg-yellow-100 disabled:bg-gray-200 disabled:text-gray-400 text-yellow-800 py-3 rounded-2xl font-medium shadow-sm"
+                                        >
+                                          {applyingStepId === step.id
+                                            ? '取り下げ中...'
+                                            : '応募を取り下げる'}
+                                        </button>
+                                      )}
+
+                                      {(myApplication.status === 'cancelled' || myApplication.status === 'rejected') && (
+                                        <p className="mt-3 text-sm text-yellow-700">
+                                          この工程が募集中であれば、再応募できます。
                                         </p>
                                       )}
                                     </div>
