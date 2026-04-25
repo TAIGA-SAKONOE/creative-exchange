@@ -1,8 +1,8 @@
 'use client'
 
 import { createClient } from '../../../lib/supabase/client'
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 type MarketStatRow = {
   median_price: number | null
@@ -13,7 +13,22 @@ type MarketStatRow = {
   confidence_label: string
 }
 
+type DirectedCreator = {
+  id: string
+  display_name: string | null
+  twitter_handle: string | null
+  bio: string | null
+}
+
 export default function NewRequest() {
+  return (
+    <Suspense fallback={<div className="p-12 text-center">読み込み中...</div>}>
+      <NewRequestContent />
+    </Suspense>
+  )
+}
+
+function NewRequestContent() {
   const [categories, setCategories] = useState<any[]>([])
   const [selectedCategory, setSelectedCategory] = useState('')
   const [title, setTitle] = useState('')
@@ -21,10 +36,13 @@ export default function NewRequest() {
   const [budget, setBudget] = useState('')
   const [deadline, setDeadline] = useState('')
   const [marketStats, setMarketStats] = useState<MarketStatRow | null>(null)
+  const [directedCreator, setDirectedCreator] = useState<DirectedCreator | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const creatorIdParam = searchParams.get('creator_id')
 
   useEffect(() => {
     const initializePage = async () => {
@@ -39,22 +57,40 @@ export default function NewRequest() {
         return
       }
 
-      const { data, error } = await supabase
+      const { data: categoryRows, error: categoryError } = await supabase
         .from('categories')
         .select('*')
         .order('name')
 
-      if (error) {
-        console.error('カテゴリ取得エラー:', error)
+      if (categoryError) {
+        console.error('カテゴリ取得エラー:', categoryError)
       } else {
-        setCategories(data || [])
+        setCategories(categoryRows || [])
+      }
+
+      if (creatorIdParam) {
+        const { data: creatorRow, error: creatorError } = await supabase
+          .from('users')
+          .select('id, display_name, twitter_handle, bio')
+          .eq('id', creatorIdParam)
+          .single()
+
+        if (creatorError) {
+          console.error('指名クリエイター取得エラー:', creatorError)
+          alert('指名クリエイターの取得に失敗しました')
+        } else if (creatorRow) {
+          setDirectedCreator(creatorRow as DirectedCreator)
+
+          const creatorName = creatorRow.display_name || 'クリエイター'
+          setTitle(`${creatorName}への依頼`)
+        }
       }
 
       setLoading(false)
     }
 
     initializePage()
-  }, [router])
+  }, [router, creatorIdParam])
 
   useEffect(() => {
     const fetchMarketStats = async () => {
@@ -120,21 +156,45 @@ export default function NewRequest() {
 
       if (!profile) throw new Error('ユーザー情報が見つかりません')
 
-      const { error } = await supabase.from('orders').insert({
-        client_id: profile.id,
-        category_id: parseInt(selectedCategory, 10),
-        title: title.trim(),
-        description: description.trim(),
-        agreed_price: budget ? parseInt(budget, 10) : null,
-        deadline: deadline || null,
-        specification: { note: '基本依頼' },
-        status: 'open',
-      })
+      if (directedCreator && String(directedCreator.id) === String(profile.id)) {
+        throw new Error('自分自身には依頼できません')
+      }
+
+      const orderStatus = directedCreator ? 'matched' : 'open'
+
+      const { data: createdOrder, error } = await supabase
+        .from('orders')
+        .insert({
+          client_id: profile.id,
+          creator_id: directedCreator?.id || null,
+          category_id: parseInt(selectedCategory, 10),
+          title: title.trim(),
+          description: description.trim(),
+          agreed_price: budget ? parseInt(budget, 10) : null,
+          deadline: deadline || null,
+          specification: {
+            note: directedCreator ? '指名依頼' : '基本依頼',
+            directed_creator_id: directedCreator?.id || null,
+          },
+          status: orderStatus,
+        })
+        .select('id')
+        .single()
 
       if (error) throw error
 
-      alert('依頼を作成しました！')
-      router.push('/mypage')
+      if (directedCreator?.id && createdOrder?.id) {
+        await supabase.from('notifications').insert({
+          user_id: directedCreator.id,
+          type: 'direct_request',
+          title: '新しい指名依頼があります',
+          body: `「${title.trim()}」が届きました。`,
+          link_url: `/request/${createdOrder.id}`,
+        })
+      }
+
+      alert(directedCreator ? '指名依頼を作成しました！' : '依頼を作成しました！')
+      router.push(createdOrder?.id ? `/request/${createdOrder.id}` : '/mypage')
     } catch (err: any) {
       alert('依頼作成に失敗しました: ' + err.message)
     } finally {
@@ -155,7 +215,26 @@ export default function NewRequest() {
         </button>
 
         <div className="bg-white rounded-2xl shadow p-8">
-          <h1 className="text-3xl font-bold mb-8">新しい依頼を作成</h1>
+          <h1 className="text-3xl font-bold mb-4">新しい依頼を作成</h1>
+
+          {directedCreator && (
+            <div className="mb-8 bg-blue-50 border border-blue-200 rounded-2xl p-5">
+              <p className="text-sm text-blue-600 font-medium mb-2">
+                指名依頼
+              </p>
+              <p className="text-xl font-bold text-gray-900">
+                {directedCreator.display_name || '名称未設定'}
+              </p>
+              <p className="text-sm text-gray-600">
+                @{directedCreator.twitter_handle || 'no handle'}
+              </p>
+              {directedCreator.bio && (
+                <p className="mt-3 text-sm text-gray-700 leading-6">
+                  {directedCreator.bio}
+                </p>
+              )}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-8">
             <div>
@@ -275,7 +354,11 @@ export default function NewRequest() {
               disabled={submitting}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-4 rounded-xl font-medium text-lg"
             >
-              {submitting ? '依頼を作成中...' : 'この内容で依頼を作成する'}
+              {submitting
+                ? '依頼を作成中...'
+                : directedCreator
+                  ? 'このクリエイターに依頼する'
+                  : 'この内容で依頼を作成する'}
             </button>
           </form>
         </div>
