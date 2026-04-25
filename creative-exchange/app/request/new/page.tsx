@@ -13,7 +13,7 @@ type MarketStatRow = {
   confidence_label: string
 }
 
-type DirectedCreator = {
+type CreatorOption = {
   id: string
   display_name: string | null
   twitter_handle: string | null
@@ -32,12 +32,19 @@ type CategoryGroup = {
   items: CategoryOption[]
 }
 
+type RequestType = 'public' | 'named'
+
 type RequestStepInput = {
   title: string
   description: string
   category_id: string
   budget: string
   deadline: string
+  named_creator: CreatorOption | null
+  creator_search: string
+  creator_candidates: CreatorOption[]
+  creator_searching: boolean
+  creator_dropdown_open: boolean
 }
 
 const createEmptyStep = (index: number): RequestStepInput => ({
@@ -46,27 +53,12 @@ const createEmptyStep = (index: number): RequestStepInput => ({
   category_id: '',
   budget: '',
   deadline: '',
+  named_creator: null,
+  creator_search: '',
+  creator_candidates: [],
+  creator_searching: false,
+  creator_dropdown_open: false,
 })
-
-const getTodayDateString = () => {
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const day = String(today.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-const isPastDate = (dateString: string) => {
-  if (!dateString) return false
-
-  const today = new Date()
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-
-  const target = new Date(dateString)
-  const targetStart = new Date(target.getFullYear(), target.getMonth(), target.getDate())
-
-  return targetStart.getTime() < todayStart.getTime()
-}
 
 const groupCategoriesByParent = (categories: CategoryOption[]): CategoryGroup[] => {
   const grouped = new Map<string, CategoryOption[]>()
@@ -98,6 +90,7 @@ export default function NewRequest() {
 function NewRequestContent() {
   const [categories, setCategories] = useState<CategoryOption[]>([])
 
+  const [requestType, setRequestType] = useState<RequestType>('public')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [steps, setSteps] = useState<RequestStepInput[]>([createEmptyStep(0)])
@@ -105,19 +98,23 @@ function NewRequestContent() {
   const [stepMarketStats, setStepMarketStats] = useState<
     Record<number, MarketStatRow | null>
   >({})
-  const [directedCreator, setDirectedCreator] = useState<DirectedCreator | null>(null)
+
+  const [initialNamedCreator, setInitialNamedCreator] =
+    useState<CreatorOption | null>(null)
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
   const router = useRouter()
   const searchParams = useSearchParams()
-  const creatorIdParam = searchParams.get('creator_id')
 
-  const todayDateString = getTodayDateString()
+  const creatorIdParam = searchParams.get('creator_id')
+  const typeParam = searchParams.get('type')
+
+  const isNamedRequest = requestType === 'named'
   const isMultiStep = steps.length >= 2
 
-  const categoryGroupedOptions = useMemo(() => {
+  const groupedCategories = useMemo(() => {
     return groupCategoriesByParent(categories)
   }, [categories])
 
@@ -165,6 +162,10 @@ function NewRequestContent() {
         setCategories((categoryRows || []) as CategoryOption[])
       }
 
+      if (typeParam === 'named') {
+        setRequestType('named')
+      }
+
       if (creatorIdParam) {
         const { data: creatorRow, error: creatorError } = await supabase
           .from('users')
@@ -176,10 +177,27 @@ function NewRequestContent() {
           console.error('指名クリエイター取得エラー:', creatorError)
           alert('指名クリエイターの取得に失敗しました')
         } else if (creatorRow) {
-          setDirectedCreator(creatorRow as DirectedCreator)
+          const creator = creatorRow as CreatorOption
+          setInitialNamedCreator(creator)
+          setRequestType('named')
 
-          const creatorName = creatorRow.display_name || 'クリエイター'
+          const creatorName = creator.display_name || 'クリエイター'
           setTitle(`${creatorName}への依頼`)
+
+          setSteps((prev) =>
+            prev.map((step, index) =>
+              index === 0
+                ? {
+                    ...step,
+                    named_creator: creator,
+                    creator_search:
+                      creator.display_name ||
+                      creator.twitter_handle ||
+                      '名称未設定',
+                  }
+                : step
+            )
+          )
         }
       }
 
@@ -187,7 +205,7 @@ function NewRequestContent() {
     }
 
     initializePage()
-  }, [router, creatorIdParam])
+  }, [router, creatorIdParam, typeParam])
 
   useEffect(() => {
     const fetchStepMarketStats = async () => {
@@ -237,7 +255,7 @@ function NewRequestContent() {
   const updateStep = (
     index: number,
     field: keyof RequestStepInput,
-    value: string
+    value: string | boolean | CreatorOption | CreatorOption[] | null
   ) => {
     setSteps((prev) =>
       prev.map((step, stepIndex) =>
@@ -280,6 +298,58 @@ function NewRequestContent() {
     })
   }
 
+  const searchCreatorsForStep = async (index: number, keyword: string) => {
+    updateStep(index, 'creator_search', keyword)
+    updateStep(index, 'named_creator', null)
+    updateStep(index, 'creator_dropdown_open', true)
+
+    const trimmed = keyword.trim()
+
+    if (!trimmed) {
+      updateStep(index, 'creator_candidates', [])
+      updateStep(index, 'creator_searching', false)
+      return
+    }
+
+    updateStep(index, 'creator_searching', true)
+
+    const supabase = createClient()
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, display_name, twitter_handle, bio')
+      .or(`display_name.ilike.%${trimmed}%,twitter_handle.ilike.%${trimmed}%`)
+      .limit(10)
+
+    if (error) {
+      console.error('クリエイター検索エラー:', error)
+      updateStep(index, 'creator_candidates', [])
+      updateStep(index, 'creator_searching', false)
+      return
+    }
+
+    updateStep(index, 'creator_candidates', (data || []) as CreatorOption[])
+    updateStep(index, 'creator_searching', false)
+  }
+
+  const selectCreatorForStep = (index: number, creator: CreatorOption) => {
+    updateStep(index, 'named_creator', creator)
+    updateStep(
+      index,
+      'creator_search',
+      creator.display_name || creator.twitter_handle || '名称未設定'
+    )
+    updateStep(index, 'creator_candidates', [])
+    updateStep(index, 'creator_dropdown_open', false)
+  }
+
+  const clearCreatorForStep = (index: number) => {
+    updateStep(index, 'named_creator', null)
+    updateStep(index, 'creator_search', '')
+    updateStep(index, 'creator_candidates', [])
+    updateStep(index, 'creator_dropdown_open', false)
+  }
+
   const validateSteps = () => {
     if (steps.length < 1) {
       alert('工程は最低1つ必要です')
@@ -313,13 +383,47 @@ function NewRequestContent() {
         }
       }
 
-      if (step.deadline && isPastDate(step.deadline)) {
-        alert(`${label}の納期に過去日は指定できません`)
+      if (isNamedRequest && !step.named_creator?.id) {
+        alert(`${label}の指名クリエイターを選択してください`)
         return false
       }
     }
 
     return true
+  }
+
+  const notifyNamedCreators = async ({
+    orderId,
+    orderTitle,
+    selectedSteps,
+  }: {
+    orderId: string
+    orderTitle: string
+    selectedSteps: Array<{
+      step_number: number
+      title: string
+      creator_id: string | null
+    }>
+  }) => {
+    const supabase = createClient()
+
+    const notifications = selectedSteps
+      .filter((step) => step.creator_id)
+      .map((step) => ({
+        user_id: step.creator_id,
+        type: 'direct_request',
+        title: '新しい指名依頼があります',
+        body: `「${orderTitle}」の工程「${step.title}」に指名されました。`,
+        link_url: `/request/${orderId}`,
+      }))
+
+    if (notifications.length === 0) return
+
+    const { error } = await supabase.from('notifications').insert(notifications)
+
+    if (error) {
+      console.error('指名依頼通知エラー:', error)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -350,7 +454,11 @@ function NewRequestContent() {
 
       if (!profile) throw new Error('ユーザー情報が見つかりません')
 
-      if (directedCreator && String(directedCreator.id) === String(profile.id)) {
+      const selfAssignedStep = steps.find(
+        (step) => step.named_creator?.id && String(step.named_creator.id) === String(profile.id)
+      )
+
+      if (selfAssignedStep) {
         throw new Error('自分自身には依頼できません')
       }
 
@@ -364,19 +472,25 @@ function NewRequestContent() {
           required_category_id: parseInt(step.category_id, 10),
           budget: Number.isFinite(budgetValue) ? budgetValue : 0,
           deadline: step.deadline || null,
+          creator_id: isNamedRequest ? step.named_creator?.id || null : null,
+          status: isNamedRequest ? 'matched' : 'open',
         }
       })
 
       const firstStep = normalizedSteps[0]
+      const firstNamedCreatorId =
+        isNamedRequest && normalizedSteps.length > 0
+          ? normalizedSteps.find((step) => step.creator_id)?.creator_id || null
+          : null
 
       const { data: createdOrder, error: orderError } = await supabase
         .from('orders')
         .insert({
           client_id: profile.id,
 
-          // 指名依頼の場合は親ordersにもcreator_idを持たせておく。
-          // ただし工程管理では実態は order_steps.creator_id / status で管理する。
-          creator_id: directedCreator?.id || null,
+          // 親ordersのcreator_idは互換用。
+          // 実際の担当者管理は order_steps.creator_id で行う。
+          creator_id: firstNamedCreatorId,
 
           category_id: firstStep.required_category_id,
           title: title.trim(),
@@ -389,15 +503,17 @@ function NewRequestContent() {
           deadline: latestDeadline,
 
           specification: {
-            note: directedCreator ? '指名依頼' : '基本依頼',
-            directed_creator_id: directedCreator?.id || null,
-            phase: 'D',
+            note: isNamedRequest ? '指名依頼' : '公開依頼',
+            request_type: requestType,
+            initial_named_creator_id: initialNamedCreator?.id || null,
+            phase: 'G-1',
             workflow: 'order_steps',
           },
 
           // Phase D方針：orders.statusは公開中 / 完了 / キャンセルのみ。
           status: 'open',
 
+          is_named: isNamedRequest,
           is_multi_step: normalizedSteps.length >= 2,
           total_steps: normalizedSteps.length,
         })
@@ -407,25 +523,17 @@ function NewRequestContent() {
       if (orderError) throw orderError
       if (!createdOrder?.id) throw new Error('依頼作成に失敗しました')
 
-      const stepRows = normalizedSteps.map((step) => {
-        const isDirectedSingleStep =
-          directedCreator?.id && normalizedSteps.length === 1
-
-        return {
-          order_id: createdOrder.id,
-          step_number: step.step_number,
-          title: step.title,
-          description: step.description,
-          required_category_id: step.required_category_id,
-          budget: step.budget,
-          deadline: step.deadline,
-
-          // 指名依頼かつ単一工程の場合は、その工程を指名先に割り当てる。
-          // 複数工程の場合は、工程ごとに別クリエイターが入り得るため open にする。
-          creator_id: isDirectedSingleStep ? directedCreator.id : null,
-          status: isDirectedSingleStep ? 'matched' : 'open',
-        }
-      })
+      const stepRows = normalizedSteps.map((step) => ({
+        order_id: createdOrder.id,
+        step_number: step.step_number,
+        title: step.title,
+        description: step.description,
+        required_category_id: step.required_category_id,
+        budget: step.budget,
+        deadline: step.deadline,
+        creator_id: step.creator_id,
+        status: step.status,
+      }))
 
       const { error: stepsError } = await supabase
         .from('order_steps')
@@ -433,22 +541,20 @@ function NewRequestContent() {
 
       if (stepsError) throw stepsError
 
-      if (directedCreator?.id && createdOrder?.id) {
-        await supabase.from('notifications').insert({
-          user_id: directedCreator.id,
-          type: 'direct_request',
-          title: '新しい指名依頼があります',
-          body: `「${title.trim()}」が届きました。`,
-          link_url: `/request/${createdOrder.id}`,
+      if (isNamedRequest) {
+        await notifyNamedCreators({
+          orderId: createdOrder.id,
+          orderTitle: title.trim(),
+          selectedSteps: normalizedSteps,
         })
       }
 
       alert(
-        isMultiStep
-          ? '工程付き依頼を作成しました！'
-          : directedCreator
-            ? '指名依頼を作成しました！'
-            : '依頼を作成しました！'
+        isNamedRequest
+          ? '指名依頼を作成しました！'
+          : isMultiStep
+            ? '工程付き公開依頼を作成しました！'
+            : '公開依頼を作成しました！'
       )
 
       router.push(`/request/${createdOrder.id}`)
@@ -475,31 +581,83 @@ function NewRequestContent() {
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-3">新しい依頼を作成</h1>
             <p className="text-gray-500">
-              依頼を単一工程、または複数工程に分けて作成できます。
+              公開依頼、または工程ごとの指名依頼として作成できます。
             </p>
           </div>
 
-          {directedCreator && (
-            <div className="mb-8 bg-blue-50 border border-blue-200 rounded-2xl p-5">
-              <p className="text-sm text-blue-600 font-medium mb-2">
-                指名依頼
-              </p>
-              <p className="text-xl font-bold text-gray-900">
-                {directedCreator.display_name || '名称未設定'}
-              </p>
-              <p className="text-sm text-gray-600">
-                @{directedCreator.twitter_handle || 'no handle'}
-              </p>
-              {directedCreator.bio && (
-                <p className="mt-3 text-sm text-gray-700 leading-6">
-                  {directedCreator.bio}
-                </p>
-              )}
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-10">
             <div className="space-y-6">
+              <div className="bg-gray-50 border border-gray-200 rounded-3xl p-6">
+                <label className="block text-sm font-medium text-gray-700 mb-4">
+                  依頼タイプ
+                </label>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setRequestType('public')}
+                    className={`text-left rounded-2xl border p-5 transition ${
+                      requestType === 'public'
+                        ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-100'
+                        : 'border-gray-200 bg-white hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <span
+                        className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                          requestType === 'public'
+                            ? 'border-blue-600 bg-blue-600'
+                            : 'border-gray-300'
+                        }`}
+                      >
+                        {requestType === 'public' && (
+                          <span className="w-2 h-2 bg-white rounded-full" />
+                        )}
+                      </span>
+                      <span className="font-bold">公開依頼</span>
+                    </div>
+                    <p className="text-sm text-gray-600 leading-6">
+                      Exchangeに公開し、受注希望者を募ります。
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRequestType('named')}
+                    className={`text-left rounded-2xl border p-5 transition ${
+                      requestType === 'named'
+                        ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-100'
+                        : 'border-gray-200 bg-white hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <span
+                        className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                          requestType === 'named'
+                            ? 'border-blue-600 bg-blue-600'
+                            : 'border-gray-300'
+                        }`}
+                      >
+                        {requestType === 'named' && (
+                          <span className="w-2 h-2 bg-white rounded-full" />
+                        )}
+                      </span>
+                      <span className="font-bold">指名依頼</span>
+                    </div>
+                    <p className="text-sm text-gray-600 leading-6">
+                      工程ごとにクリエイターを指名し、即マッチングします。
+                    </p>
+                  </button>
+                </div>
+
+                {isNamedRequest && (
+                  <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-sm text-yellow-800 leading-7">
+                    指名依頼は、選択したクリエイターへ即時に工程が割り当てられます。
+                    公開募集には表示されません。
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   依頼タイトル
@@ -624,8 +782,7 @@ function NewRequestContent() {
                           required
                         >
                           <option value="">品目を選択してください</option>
-
-                          {categoryGroupedOptions.map((group) => (
+                          {groupedCategories.map((group) => (
                             <optgroup
                               key={group.parentCategory}
                               label={group.parentCategory}
@@ -662,7 +819,6 @@ function NewRequestContent() {
                         </label>
                         <input
                           type="date"
-                          min={todayDateString}
                           value={step.deadline}
                           onChange={(e) =>
                             updateStep(index, 'deadline', e.target.value)
@@ -670,6 +826,94 @@ function NewRequestContent() {
                           className="w-full p-4 border border-gray-300 rounded-2xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
                         />
                       </div>
+
+                      {isNamedRequest && (
+                        <div className="md:col-span-2 relative">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            指名するクリエイター
+                          </label>
+
+                          <div className="flex gap-3">
+                            <input
+                              type="text"
+                              value={step.creator_search}
+                              onFocus={() =>
+                                updateStep(index, 'creator_dropdown_open', true)
+                              }
+                              onChange={(e) =>
+                                searchCreatorsForStep(index, e.target.value)
+                              }
+                              placeholder="表示名またはX IDで検索"
+                              className="flex-1 p-4 border border-gray-300 rounded-2xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
+                            />
+
+                            {step.named_creator && (
+                              <button
+                                type="button"
+                                onClick={() => clearCreatorForStep(index)}
+                                className="px-4 py-2 rounded-2xl border border-gray-200 bg-white hover:bg-gray-50 text-sm font-medium"
+                              >
+                                解除
+                              </button>
+                            )}
+                          </div>
+
+                          {step.named_creator && (
+                            <div className="mt-3 bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                              <p className="text-sm text-blue-600 font-medium mb-1">
+                                指名中
+                              </p>
+                              <p className="font-bold">
+                                {step.named_creator.display_name || '名称未設定'}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                @{step.named_creator.twitter_handle || 'no handle'}
+                              </p>
+                            </div>
+                          )}
+
+                          {step.creator_dropdown_open &&
+                            !step.named_creator &&
+                            step.creator_search.trim() && (
+                              <div className="absolute left-0 right-0 top-full mt-2 z-20 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden">
+                                {step.creator_searching ? (
+                                  <div className="p-4 text-sm text-gray-500">
+                                    検索中...
+                                  </div>
+                                ) : step.creator_candidates.length > 0 ? (
+                                  <div className="max-h-72 overflow-y-auto">
+                                    {step.creator_candidates.map((creator) => (
+                                      <button
+                                        key={creator.id}
+                                        type="button"
+                                        onClick={() =>
+                                          selectCreatorForStep(index, creator)
+                                        }
+                                        className="w-full text-left p-4 hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
+                                      >
+                                        <p className="font-bold">
+                                          {creator.display_name || '名称未設定'}
+                                        </p>
+                                        <p className="text-sm text-gray-600">
+                                          @{creator.twitter_handle || 'no handle'}
+                                        </p>
+                                        {creator.bio && (
+                                          <p className="mt-2 text-sm text-gray-500 line-clamp-2">
+                                            {creator.bio}
+                                          </p>
+                                        )}
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="p-4 text-sm text-gray-500">
+                                    該当するクリエイターがいません
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                        </div>
+                      )}
                     </div>
 
                     {step.category_id &&
@@ -736,7 +980,14 @@ function NewRequestContent() {
               <div className="bg-gray-50 border border-gray-200 rounded-3xl p-6">
                 <h2 className="text-xl font-bold mb-4">作成内容の確認</h2>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-500 mb-1">依頼タイプ</p>
+                    <p className="font-bold">
+                      {isNamedRequest ? '指名依頼' : '公開依頼'}
+                    </p>
+                  </div>
+
                   <div>
                     <p className="text-gray-500 mb-1">依頼形式</p>
                     <p className="font-bold">
@@ -764,10 +1015,10 @@ function NewRequestContent() {
                   </div>
                 )}
 
-                {directedCreator && isMultiStep && (
-                  <div className="mt-5 p-4 bg-yellow-50 border border-yellow-200 rounded-2xl text-sm text-yellow-800 leading-7">
-                    複数工程の指名依頼では、親依頼には指名先を記録しますが、
-                    各工程は募集中として作成されます。工程ごとの担当者は次のフェーズで個別に受注できます。
+                {isNamedRequest && (
+                  <div className="mt-5 p-4 bg-blue-50 border border-blue-200 rounded-2xl text-sm text-blue-800 leading-7">
+                    指名依頼として作成されます。各工程は選択したクリエイターに即時割り当てられ、
+                    工程ステータスは「制作中」として保存されます。
                   </div>
                 )}
               </div>
@@ -780,11 +1031,11 @@ function NewRequestContent() {
             >
               {submitting
                 ? '依頼を作成中...'
-                : isMultiStep
-                  ? '工程付き依頼を作成する'
-                  : directedCreator
-                    ? 'このクリエイターに依頼する'
-                    : 'この内容で依頼を作成する'}
+                : isNamedRequest
+                  ? '指名依頼を作成する'
+                  : isMultiStep
+                    ? '工程付き公開依頼を作成する'
+                    : '公開依頼を作成する'}
             </button>
           </form>
         </div>
