@@ -114,6 +114,7 @@ function ExchangePageContent() {
   const [activeTab, setActiveTab] = useState<'requests' | 'creators' | 'listings'>(initialTab)
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null)
   const [buyingListingId, setBuyingListingId] = useState<string | null>(null)
+  const [creatingConsultationCreatorId, setCreatingConsultationCreatorId] = useState<string | null>(null)
 
   const [requestCategoryId, setRequestCategoryId] = useState('')
   const [titleKeyword, setTitleKeyword] = useState('')
@@ -244,7 +245,6 @@ function ExchangePageContent() {
 
         setCreators(filteredCreatorRows)
 
-        // user_categories が未設定でも、クリエイター本体は表示する
         const creatorIds = filteredCreatorRows.map((creator) => creator.id)
 
         if (creatorIds.length === 0) {
@@ -567,6 +567,7 @@ function ExchangePageContent() {
     creatorNameKeyword,
     creatorBioKeyword,
     creatorSkillKeyword,
+    creatorCategoryMap,
   ])
 
   const filteredListings = useMemo(() => {
@@ -659,6 +660,62 @@ function ExchangePageContent() {
       alert(err?.message || '受注処理中にエラーが発生しました')
     } finally {
       setAcceptingOrderId(null)
+    }
+  }
+
+  const handleCreateConsultation = async (creator: CreatorItem) => {
+    if (!currentUser?.id) {
+      window.location.href = '/login'
+      return
+    }
+
+    if (String(currentUser.id) === String(creator.id)) {
+      alert('自分自身には相談できません')
+      return
+    }
+
+    const categoryIds = getCreatorCategoryIds(creator.id)
+    const consultationCategoryId = categoryIds[0] || categoryOptions[0]?.id || null
+
+    if (!consultationCategoryId) {
+      alert('相談用の品目を設定できませんでした。品目データを確認してください。')
+      return
+    }
+
+    setCreatingConsultationCreatorId(creator.id)
+
+    try {
+      const supabase = createClient()
+      const creatorName = creator.display_name || 'クリエイター'
+
+      const { data: newOrder, error: insertError } = await supabase
+        .from('orders')
+        .insert({
+          client_id: currentUser.id,
+          creator_id: creator.id,
+          category_id: consultationCategoryId,
+          title: `${creatorName}への事前相談`,
+          description:
+            '事前相談用の下書きです。依頼内容・予算・納期などをチャットで相談してください。',
+          agreed_price: 0,
+          deadline: null,
+          specification: {
+            type: 'creator_consultation',
+            creator_id: creator.id,
+          },
+          status: 'draft',
+        })
+        .select('id')
+        .single()
+
+      if (insertError) throw insertError
+      if (!newOrder?.id) throw new Error('相談用依頼の作成に失敗しました')
+
+      router.push(`/request/${newOrder.id}`)
+    } catch (err: any) {
+      alert('相談の開始に失敗しました: ' + (err?.message || '不明なエラー'))
+    } finally {
+      setCreatingConsultationCreatorId(null)
     }
   }
 
@@ -1257,7 +1314,7 @@ function ExchangePageContent() {
                           <div className="bg-gray-50 rounded-3xl p-6 mb-4 border border-gray-100">
                             <p className="text-sm text-gray-500 mb-2">プロフィール導線</p>
                             <p className="text-lg font-semibold text-gray-900">
-                              価格表や外部ポートフォリオを確認できます
+                              価格表・相談・指名依頼へ進めます
                             </p>
                           </div>
 
@@ -1267,6 +1324,23 @@ function ExchangePageContent() {
                               className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-medium transition shadow-sm"
                             >
                               価格表を見る
+                            </Link>
+
+                            <button
+                              onClick={() => handleCreateConsultation(creator)}
+                              disabled={creatingConsultationCreatorId === creator.id}
+                              className="w-full bg-gray-900 hover:bg-black disabled:bg-gray-400 text-white py-4 rounded-2xl font-medium transition shadow-sm"
+                            >
+                              {creatingConsultationCreatorId === creator.id
+                                ? '相談を作成中...'
+                                : 'このクリエイターに相談する'}
+                            </button>
+
+                            <Link
+                              href={`/request/new?creator_id=${creator.id}`}
+                              className="block w-full text-center bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 py-4 rounded-2xl font-medium transition"
+                            >
+                              このクリエイターに依頼する
                             </Link>
 
                             {portfolioUrl ? (
