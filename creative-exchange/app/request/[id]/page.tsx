@@ -900,6 +900,68 @@ export default function RequestDetail() {
     }
   }
 
+  const syncParentOrderCompletion = async (supabase: any) => {
+    if (!request) return false
+
+    const { data: latestSteps, error: stepsError } = await supabase
+      .from('order_steps')
+      .select('id, status, creator_id')
+      .eq('order_id', id)
+
+    if (stepsError) {
+      throw stepsError
+    }
+
+    const steps = latestSteps ?? []
+
+    if (steps.length === 0) {
+      return false
+    }
+
+    const allCompleted = steps.every((step: any) => step.status === 'completed')
+
+    if (!allCompleted) {
+      return false
+    }
+
+    const completedAt = new Date().toISOString()
+
+    const { error: orderUpdateError } = await supabase
+      .from('orders')
+      .update({
+        status: 'completed',
+        completed_at: completedAt,
+        updated_at: completedAt,
+      })
+      .eq('id', id)
+
+    if (orderUpdateError) {
+      throw orderUpdateError
+    }
+
+    const uniqueCreatorIds = Array.from(
+      new Set(
+        steps
+          .map((step: any) => step.creator_id)
+          .filter(Boolean)
+      )
+    ) as string[]
+
+    await Promise.all(
+      uniqueCreatorIds.map((creatorId) =>
+        createNotification({
+          userId: creatorId,
+          type: 'order_completed',
+          title: '依頼全体が完了しました',
+          body: `「${request.title}」のすべての工程が検収完了となり、依頼全体が完了しました。`,
+          linkUrl: `/request/${id}`,
+        })
+      )
+    )
+
+    return true
+  }
+
   const handleCompleteStep = async (step: OrderStep) => {
     if (!profile?.id || !request) return
 
@@ -941,7 +1003,14 @@ export default function RequestDetail() {
         })
       }
 
-      alert('工程を検収完了にしました')
+      const parentCompleted = await syncParentOrderCompletion(supabase)
+
+      if (parentCompleted) {
+        alert('工程を検収完了にしました。すべての工程が完了したため、依頼全体も完了になりました。')
+      } else {
+        alert('工程を検収完了にしました')
+      }
+
       loadData()
     } catch (err: any) {
       alert('工程の検収に失敗しました: ' + err.message)
