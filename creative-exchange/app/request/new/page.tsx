@@ -138,6 +138,14 @@ function NewRequestContent() {
     return deadlines[deadlines.length - 1]
   }, [steps])
 
+const today = useMemo(() => {
+  const now = new Date()
+  const yyyy = now.getFullYear()
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const dd = String(now.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}, [])
+  
   useEffect(() => {
     const initializePage = async () => {
       const supabase = createClient()
@@ -358,6 +366,19 @@ function NewRequestContent() {
       return false
     }
 
+if (step.budget.trim() !== '') {
+  const budgetValue = Number(step.budget)
+  if (!Number.isFinite(budgetValue) || budgetValue < 0) {
+    alert(`${label}の予算は0以上の数値で入力してください`)
+    return false
+  }
+}
+
+if (step.deadline && step.deadline < today) {
+  alert(`${label}の納期には今日以降の日付を選択してください`)
+  return false
+}
+    
     if (steps.length > 10) {
       alert('工程は最大10個までです')
       return false
@@ -842,13 +863,14 @@ function NewRequestContent() {
                           工程納期
                         </label>
                         <input
-                          type="date"
-                          value={step.deadline}
-                          onChange={(e) =>
-                            updateStep(index, 'deadline', e.target.value)
-                          }
-                          className="w-full p-4 border border-gray-300 rounded-2xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
-                        />
+  type="date"
+  value={step.deadline}
+  min={today}
+  onChange={(e) =>
+    updateStep(index, 'deadline', e.target.value)
+  }
+  className="w-full p-4 border border-gray-300 rounded-2xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
+/>
                       </div>
 
                       <div>
