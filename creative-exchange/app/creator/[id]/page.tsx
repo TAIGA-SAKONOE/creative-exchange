@@ -24,6 +24,22 @@ type CreatorCategory = {
   category_name: string
 }
 
+type CreatorReview = {
+  id: string
+  order_id: string
+  order_step_id: string | null
+  reviewer_id: string
+  reviewee_id: string
+  rating: number | null
+  comment: string | null
+  role: string | null
+  created_at: string | null
+  reviewer_name: string
+  reviewer_handle: string | null
+  step_title: string | null
+  step_number: number | null
+}
+
 export default function CreatorProfile() {
   const params = useParams()
   const creatorId = params.id as string
@@ -34,6 +50,7 @@ export default function CreatorProfile() {
   const [consultationCategoryId, setConsultationCategoryId] = useState<number | null>(null)
   const [personalPrices, setPersonalPrices] = useState<any[]>([])
   const [productSales, setProductSales] = useState<ProductSalesSummary[]>([])
+  const [receivedReviews, setReceivedReviews] = useState<CreatorReview[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [creatingConsultation, setCreatingConsultation] = useState(false)
@@ -71,12 +88,29 @@ export default function CreatorProfile() {
           .single()
 
         if (profileError) throw profileError
+
         if (!profile) {
           setCreator(null)
           return
         }
 
-        setCreator(profile)
+        const nextViewCount = Number(profile.profile_view_count || 0) + 1
+
+        const { error: viewCountError } = await supabase
+          .from('users')
+          .update({
+            profile_view_count: nextViewCount,
+          })
+          .eq('id', creatorId)
+
+        if (viewCountError) {
+          console.error('プロフィール閲覧数更新エラー', viewCountError)
+        }
+
+        setCreator({
+          ...profile,
+          profile_view_count: nextViewCount,
+        })
 
         const { data: categoryLinks, error: categoryLinksError } = await supabase
           .from('user_categories')
@@ -117,6 +151,96 @@ export default function CreatorProfile() {
             .limit(1)
 
           setConsultationCategoryId(fallbackCategories?.[0]?.id || null)
+        }
+
+        const { data: reviews, error: reviewsError } = await supabase
+          .from('reviews')
+          .select(`
+            id,
+            order_id,
+            order_step_id,
+            reviewer_id,
+            reviewee_id,
+            rating,
+            comment,
+            role,
+            created_at
+          `)
+          .eq('reviewee_id', creatorId)
+          .order('created_at', { ascending: false })
+
+        if (reviewsError) {
+          console.error('レビュー取得エラー', reviewsError)
+          setReceivedReviews([])
+        } else {
+          const reviewerIds = Array.from(
+            new Set(
+              (reviews || [])
+                .map((review: any) => review.reviewer_id)
+                .filter(Boolean)
+            )
+          )
+
+          const stepIds = Array.from(
+            new Set(
+              (reviews || [])
+                .map((review: any) => review.order_step_id)
+                .filter(Boolean)
+            )
+          )
+
+          let reviewerMap = new Map<string, any>()
+          let stepMap = new Map<string, any>()
+
+          if (reviewerIds.length > 0) {
+            const { data: reviewerRows, error: reviewerError } = await supabase
+              .from('users')
+              .select('id, display_name, twitter_handle')
+              .in('id', reviewerIds)
+
+            if (reviewerError) {
+              console.error('レビュー投稿者取得エラー', reviewerError)
+            } else {
+              reviewerMap = new Map((reviewerRows || []).map((row: any) => [row.id, row]))
+            }
+          }
+
+          if (stepIds.length > 0) {
+            const { data: stepRows, error: stepError } = await supabase
+              .from('order_steps')
+              .select('id, step_number, title')
+              .in('id', stepIds)
+
+            if (stepError) {
+              console.error('レビュー工程取得エラー', stepError)
+            } else {
+              stepMap = new Map((stepRows || []).map((row: any) => [row.id, row]))
+            }
+          }
+
+          const normalizedReviews: CreatorReview[] = (reviews || []).map((review: any) => {
+            const reviewer = reviewerMap.get(review.reviewer_id)
+            const step = review.order_step_id ? stepMap.get(review.order_step_id) : null
+
+            return {
+              id: review.id,
+              order_id: review.order_id,
+              order_step_id: review.order_step_id,
+              reviewer_id: review.reviewer_id,
+              reviewee_id: review.reviewee_id,
+              rating: review.rating,
+              comment: review.comment,
+              role: review.role,
+              created_at: review.created_at,
+              reviewer_name:
+                reviewer?.display_name || reviewer?.twitter_handle || '匿名ユーザー',
+              reviewer_handle: reviewer?.twitter_handle || null,
+              step_title: step?.title || null,
+              step_number: step?.step_number || null,
+            }
+          })
+
+          setReceivedReviews(normalizedReviews)
         }
 
         const { data: prices, error: pricesError } = await supabase.rpc(
@@ -256,6 +380,31 @@ export default function CreatorProfile() {
     return productSales.filter((item) => item.sales_count >= 1)
   }, [productSales])
 
+  const averageRating = useMemo(() => {
+    const validRatings = receivedReviews
+      .map((review) => Number(review.rating || 0))
+      .filter((rating) => Number.isFinite(rating) && rating > 0)
+
+    if (validRatings.length === 0) return 0
+
+    const total = validRatings.reduce((sum, rating) => sum + rating, 0)
+    return total / validRatings.length
+  }, [receivedReviews])
+
+  const roundedAverageRating = averageRating > 0 ? averageRating.toFixed(1) : '-'
+
+  const renderStars = (ratingValue: number) => {
+    const rounded = Math.round(ratingValue)
+
+    return (
+      <span className="inline-flex gap-0.5 text-yellow-400">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <span key={star}>{star <= rounded ? '★' : '☆'}</span>
+        ))}
+      </span>
+    )
+  }
+
   const handleCreateConsultation = async () => {
     if (!creator) return
 
@@ -364,7 +513,21 @@ export default function CreatorProfile() {
                 </div>
               </div>
 
-            
+              <div className="grid grid-cols-2 gap-3 text-right">
+                <div className="bg-white/15 border border-white/20 rounded-2xl px-5 py-4 backdrop-blur-sm">
+                  <p className="text-xs opacity-80 mb-1">プロフィール閲覧数</p>
+                  <p className="text-2xl font-bold">
+                    {Number(creator.profile_view_count || 0).toLocaleString()}
+                  </p>
+                </div>
+
+                <div className="bg-white/15 border border-white/20 rounded-2xl px-5 py-4 backdrop-blur-sm">
+                  <p className="text-xs opacity-80 mb-1">平均評価</p>
+                  <p className="text-2xl font-bold">
+                    {roundedAverageRating}
+                  </p>
+                </div>
+              </div>
             </div>
 
             {creator.bio && (
@@ -495,6 +658,89 @@ export default function CreatorProfile() {
                           販売件数: {item.sales_count}件
                         </div>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="border-t pt-12 mt-12">
+              <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
+                <div>
+                  <h2 className="text-2xl font-bold">受け取ったレビュー</h2>
+                  <p className="text-sm text-gray-500 mt-2">
+                    依頼者・取引相手から届いた評価です
+                  </p>
+                </div>
+
+                <div className="bg-yellow-50 border border-yellow-100 rounded-2xl px-5 py-4 text-right">
+                  <p className="text-sm text-gray-500 mb-1">平均評価</p>
+                  <div className="flex items-center justify-end gap-3">
+                    <span className="text-xl">
+                      {averageRating > 0 ? renderStars(averageRating) : '評価なし'}
+                    </span>
+                    <span className="text-2xl font-bold text-gray-900">
+                      {roundedAverageRating}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {receivedReviews.length}件のレビュー
+                  </p>
+                </div>
+              </div>
+
+              {receivedReviews.length === 0 ? (
+                <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-2xl">
+                  まだレビューはありません
+                  <br />
+                  取引完了後にレビューが届くとここに表示されます
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {receivedReviews.map((review) => (
+                    <div
+                      key={review.id}
+                      className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm"
+                    >
+                      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+                        <div>
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="text-xl">
+                              {renderStars(Number(review.rating || 0))}
+                            </span>
+                            <span className="font-bold text-gray-900">
+                              {review.rating || '-'} / 5
+                            </span>
+                          </div>
+
+                          <p className="text-sm text-gray-500">
+                            評価者：{review.reviewer_name}
+                            {review.reviewer_handle ? `（@${review.reviewer_handle}）` : ''}
+                          </p>
+                        </div>
+
+                        <p className="text-xs text-gray-500">
+                          {review.created_at
+                            ? new Date(review.created_at).toLocaleString('ja-JP')
+                            : ''}
+                        </p>
+                      </div>
+
+                      {review.step_title && (
+                        <div className="mb-4 inline-flex px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-sm border border-blue-100">
+                          工程{review.step_number || ''}：{review.step_title}
+                        </div>
+                      )}
+
+                      {review.comment ? (
+                        <p className="text-gray-700 leading-7 whitespace-pre-wrap">
+                          {review.comment}
+                        </p>
+                      ) : (
+                        <p className="text-gray-400 text-sm">
+                          コメントはありません
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
