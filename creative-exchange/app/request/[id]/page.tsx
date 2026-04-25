@@ -46,6 +46,27 @@ type DeliverableFile = {
   signed_url?: string | null
 }
 
+type StepApplication = {
+  id: string
+  order_id: string
+  order_step_id: string
+  applicant_id: string
+  message: string | null
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled'
+  created_at: string | null
+  updated_at: string | null
+  users?:
+    | {
+        display_name: string | null
+        twitter_handle: string | null
+      }
+    | {
+        display_name: string | null
+        twitter_handle: string | null
+      }[]
+    | null
+}
+
 export default function RequestDetail() {
   const params = useParams()
   const id = params.id as string
@@ -55,6 +76,7 @@ export default function RequestDetail() {
   const [deliverables, setDeliverables] = useState<DeliverableFile[]>([])
   const [messages, setMessages] = useState<any[]>([])
   const [reviewedStepIds, setReviewedStepIds] = useState<string[]>([])
+  const [applications, setApplications] = useState<StepApplication[]>([])
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -70,6 +92,10 @@ export default function RequestDetail() {
 
   const [messageText, setMessageText] = useState('')
   const [sendingMessage, setSendingMessage] = useState(false)
+
+  const [applicationMessages, setApplicationMessages] = useState<Record<string, string>>({})
+  const [applyingStepId, setApplyingStepId] = useState<string | null>(null)
+  const [acceptingApplicationId, setAcceptingApplicationId] = useState<string | null>(null)
 
   const [cancelling, setCancelling] = useState(false)
 
@@ -189,6 +215,25 @@ export default function RequestDetail() {
         setOrderSteps((stepRows ?? []) as unknown as OrderStep[])
       }
 
+      const { data: applicationRows, error: applicationsError } = await supabase
+        .from('order_step_applications')
+        .select(`
+          *,
+          users (
+            display_name,
+            twitter_handle
+          )
+        `)
+        .eq('order_id', id)
+        .order('created_at', { ascending: true })
+
+      if (applicationsError) {
+        console.error('order_step_applications取得エラー', applicationsError)
+        setApplications([])
+      } else {
+        setApplications((applicationRows ?? []) as unknown as StepApplication[])
+      }
+
       const { data: files, error: filesError } = await supabase
         .from('deliverables')
         .select('*')
@@ -265,6 +310,191 @@ export default function RequestDetail() {
       setError(err.message || 'データの読み込み中にエラーが発生しました')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const getApplicationUserName = (application: StepApplication) => {
+    const user = application.users
+
+    if (!user) return '不明なユーザー'
+
+    if (Array.isArray(user)) {
+      return user[0]?.display_name || user[0]?.twitter_handle || '不明なユーザー'
+    }
+
+    return user.display_name || user.twitter_handle || '不明なユーザー'
+  }
+
+  const getApplicationUserHandle = (application: StepApplication) => {
+    const user = application.users
+
+    if (!user) return null
+
+    if (Array.isArray(user)) {
+      return user[0]?.twitter_handle || null
+    }
+
+    return user.twitter_handle || null
+  }
+
+  const getStepApplications = (stepId: string) => {
+    return applications.filter((application) => application.order_step_id === stepId)
+  }
+
+  const getMyApplicationForStep = (stepId: string) => {
+    if (!profile?.id) return null
+
+    return applications.find(
+      (application) =>
+        application.order_step_id === stepId &&
+        String(application.applicant_id) === String(profile.id)
+    )
+  }
+
+  const handleApplyStep = async (step: OrderStep) => {
+    if (!profile?.id || !request) return
+
+    if (String(request.client_id) === String(profile.id)) {
+      alert('依頼者本人は応募できません')
+      return
+    }
+
+    if (step.status !== 'open') {
+      alert('この工程は現在応募できません')
+      return
+    }
+
+    const existingApplication = getMyApplicationForStep(step.id)
+
+    if (existingApplication) {
+      alert('この工程にはすでに応募済みです')
+      return
+    }
+
+    const applicationMessage = applicationMessages[step.id]?.trim() || ''
+
+    const confirmed = window.confirm(`工程「${step.title}」に応募しますか？`)
+    if (!confirmed) return
+
+    setApplyingStepId(step.id)
+
+    try {
+      const supabase = createClient()
+
+      const { error: insertError } = await supabase
+        .from('order_step_applications')
+        .insert({
+          order_id: id,
+          order_step_id: step.id,
+          applicant_id: profile.id,
+          message: applicationMessage || null,
+          status: 'pending',
+        })
+
+      if (insertError) throw insertError
+
+      await createNotification({
+        userId: request.client_id,
+        type: 'order_step_application',
+        title: '工程に応募が届きました',
+        body: `「${request.title}」の工程「${step.title}」に応募が届きました。`,
+        linkUrl: `/request/${id}`,
+      })
+
+      setApplicationMessages((prev) => ({
+        ...prev,
+        [step.id]: '',
+      }))
+
+      alert('工程に応募しました')
+      loadData()
+    } catch (err: any) {
+      if (String(err.message || '').includes('duplicate')) {
+        alert('この工程にはすでに応募済みです')
+      } else {
+        alert('応募に失敗しました: ' + err.message)
+      }
+    } finally {
+      setApplyingStepId(null)
+    }
+  }
+
+  const handleAcceptApplication = async (step: OrderStep, application: StepApplication) => {
+    if (!profile?.id || !request) return
+
+    if (String(request.client_id) !== String(profile.id)) {
+      alert('依頼者本人のみ採用できます')
+      return
+    }
+
+    if (step.status !== 'open') {
+      alert('この工程は現在採用できる状態ではありません')
+      return
+    }
+
+    if (application.status !== 'pending') {
+      alert('この応募はすでに処理済みです')
+      return
+    }
+
+    const applicantName = getApplicationUserName(application)
+    const confirmed = window.confirm(`工程「${step.title}」に ${applicantName} さんを採用しますか？`)
+    if (!confirmed) return
+
+    setAcceptingApplicationId(application.id)
+
+    try {
+      const supabase = createClient()
+
+      const { error: updateStepError } = await supabase
+        .from('order_steps')
+        .update({
+          creator_id: application.applicant_id,
+          status: 'matched',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', step.id)
+        .eq('order_id', id)
+        .eq('status', 'open')
+
+      if (updateStepError) throw updateStepError
+
+      const { error: acceptError } = await supabase
+        .from('order_step_applications')
+        .update({
+          status: 'accepted',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', application.id)
+
+      if (acceptError) throw acceptError
+
+      const { error: rejectError } = await supabase
+        .from('order_step_applications')
+        .update({
+          status: 'rejected',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('order_step_id', step.id)
+        .neq('id', application.id)
+        .eq('status', 'pending')
+
+      if (rejectError) throw rejectError
+
+      await createNotification({
+        userId: application.applicant_id,
+        type: 'order_step_application_accepted',
+        title: '工程に採用されました',
+        body: `「${request.title}」の工程「${step.title}」に採用されました。`,
+        linkUrl: `/request/${id}`,
+      })
+
+      alert('応募者を採用しました')
+      loadData()
+    } catch (err: any) {
+      alert('採用に失敗しました: ' + err.message)
+    } finally {
+      setAcceptingApplicationId(null)
     }
   }
 
@@ -740,6 +970,41 @@ export default function RequestDetail() {
     }
   }
 
+  const getApplicationStatusMeta = (status: string) => {
+    if (status === 'pending') {
+      return {
+        label: '選考中',
+        className: 'bg-yellow-50 text-yellow-700 border border-yellow-100',
+      }
+    }
+
+    if (status === 'accepted') {
+      return {
+        label: '採用済み',
+        className: 'bg-green-50 text-green-700 border border-green-100',
+      }
+    }
+
+    if (status === 'rejected') {
+      return {
+        label: '不採用',
+        className: 'bg-gray-100 text-gray-600 border border-gray-200',
+      }
+    }
+
+    if (status === 'cancelled') {
+      return {
+        label: '辞退',
+        className: 'bg-gray-100 text-gray-600 border border-gray-200',
+      }
+    }
+
+    return {
+      label: status,
+      className: 'bg-gray-100 text-gray-600 border border-gray-200',
+    }
+  }
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return null
 
@@ -747,6 +1012,15 @@ export default function RequestDetail() {
     if (Number.isNaN(date.getTime())) return dateString
 
     return date.toLocaleDateString('ja-JP')
+  }
+
+  const formatDateTime = (dateString: string | null) => {
+    if (!dateString) return ''
+
+    const date = new Date(dateString)
+    if (Number.isNaN(date.getTime())) return dateString
+
+    return date.toLocaleString('ja-JP')
   }
 
   const getStepDeliverables = (stepId: string) => {
@@ -1092,6 +1366,17 @@ export default function RequestDetail() {
                             const creatorName = getStepCreatorName(step)
                             const deadlineLabel = formatDate(step.deadline)
                             const stepDeliverables = getStepDeliverables(step.id)
+                            const stepApplications = getStepApplications(step.id)
+                            const pendingApplications = stepApplications.filter(
+                              (application) => application.status === 'pending'
+                            )
+                            const myApplication = getMyApplicationForStep(step.id)
+
+                            const canApplyThisStep =
+                              profile?.id &&
+                              !isClient &&
+                              step.status === 'open' &&
+                              !myApplication
 
                             const canDeliverThisStep =
                               profile?.id &&
@@ -1149,6 +1434,12 @@ export default function RequestDetail() {
                                             並行G{step.parallel_group}
                                           </span>
                                         )}
+
+                                        {isClient && step.status === 'open' && pendingApplications.length > 0 && (
+                                          <span className="inline-flex px-3 py-1 rounded-full bg-yellow-50 text-yellow-700 text-xs font-medium border border-yellow-100">
+                                            応募 {pendingApplications.length}件
+                                          </span>
+                                        )}
                                       </div>
 
                                       <h3 className="text-xl font-bold text-gray-900">
@@ -1188,8 +1479,146 @@ export default function RequestDetail() {
                                     </div>
                                   </div>
 
+                                  {step.status === 'open' && isClient && (
+                                    <div className="mt-5 p-5 bg-yellow-50 border border-yellow-100 rounded-2xl">
+                                      <div className="flex items-center justify-between gap-3 mb-4">
+                                        <div>
+                                          <p className="font-bold text-yellow-800">
+                                            応募者一覧
+                                          </p>
+                                          <p className="text-sm text-yellow-700 mt-1">
+                                            応募者を選ぶと、この工程の担当クリエイターとして確定します。
+                                          </p>
+                                        </div>
+
+                                        <span className="px-3 py-1 rounded-full bg-white border border-yellow-200 text-yellow-700 text-xs font-bold">
+                                          {pendingApplications.length}件
+                                        </span>
+                                      </div>
+
+                                      {pendingApplications.length > 0 ? (
+                                        <div className="space-y-3">
+                                          {pendingApplications.map((application) => {
+                                            const applicantName = getApplicationUserName(application)
+                                            const applicantHandle = getApplicationUserHandle(application)
+
+                                            return (
+                                              <div
+                                                key={application.id}
+                                                className="bg-white border border-yellow-200 rounded-2xl p-4"
+                                              >
+                                                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                                                  <div className="min-w-0">
+                                                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                                                      <p className="font-bold text-gray-900">
+                                                        {applicantName}
+                                                      </p>
+
+                                                      {applicantHandle && (
+                                                        <span className="text-sm text-gray-500">
+                                                          @{applicantHandle}
+                                                        </span>
+                                                      )}
+
+                                                      <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getApplicationStatusMeta(application.status).className}`}>
+                                                        {getApplicationStatusMeta(application.status).label}
+                                                      </span>
+                                                    </div>
+
+                                                    {application.message ? (
+                                                      <p className="text-sm text-gray-700 whitespace-pre-wrap leading-6">
+                                                        {application.message}
+                                                      </p>
+                                                    ) : (
+                                                      <p className="text-sm text-gray-400">
+                                                        応募メッセージはありません
+                                                      </p>
+                                                    )}
+
+                                                    <p className="text-xs text-gray-400 mt-2">
+                                                      応募日時: {formatDateTime(application.created_at)}
+                                                    </p>
+                                                  </div>
+
+                                                  <button
+                                                    onClick={() => handleAcceptApplication(step, application)}
+                                                    disabled={acceptingApplicationId === application.id}
+                                                    className="shrink-0 px-5 py-3 rounded-2xl bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium transition"
+                                                  >
+                                                    {acceptingApplicationId === application.id
+                                                      ? '採用中...'
+                                                      : 'この人を採用する'}
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            )
+                                          })}
+                                        </div>
+                                      ) : (
+                                        <div className="p-4 bg-white border border-yellow-100 rounded-2xl text-sm text-yellow-700">
+                                          まだ応募はありません。
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {canApplyThisStep && (
+                                    <div className="mt-5 p-5 bg-blue-50 border border-blue-100 rounded-2xl">
+                                      <p className="font-medium text-blue-700 mb-2">
+                                        この工程に応募する
+                                      </p>
+
+                                      <p className="text-sm text-blue-700 leading-7 mb-4">
+                                        依頼者が応募内容を確認し、採用するとこの工程の担当者になります。
+                                      </p>
+
+                                      <textarea
+                                        value={applicationMessages[step.id] || ''}
+                                        onChange={(e) =>
+                                          setApplicationMessages((prev) => ({
+                                            ...prev,
+                                            [step.id]: e.target.value,
+                                          }))
+                                        }
+                                        rows={4}
+                                        className="w-full px-4 py-3 border border-blue-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-200 resize-y bg-white mb-4"
+                                        placeholder="応募メッセージを入力してください。実績、対応可能時期、提案内容などを書けます。"
+                                      />
+
+                                      <button
+                                        onClick={() => handleApplyStep(step)}
+                                        disabled={applyingStepId === step.id}
+                                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-4 rounded-2xl font-medium shadow-sm"
+                                      >
+                                        {applyingStepId === step.id
+                                          ? '応募中...'
+                                          : 'この工程に応募する'}
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {myApplication && step.status === 'open' && !isClient && (
+                                    <div className="mt-5 p-4 bg-yellow-50 border border-yellow-100 rounded-2xl">
+                                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                                        <p className="font-medium text-yellow-800">
+                                          この工程に応募済みです
+                                        </p>
+
+                                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getApplicationStatusMeta(myApplication.status).className}`}>
+                                          {getApplicationStatusMeta(myApplication.status).label}
+                                        </span>
+                                      </div>
+
+                                      {myApplication.message && (
+                                        <p className="text-sm text-yellow-800 whitespace-pre-wrap leading-6">
+                                          {myApplication.message}
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+
                                   {stepDeliverables.length > 0 && (
-                                    <div className="mb-4">
+                                    <div className="mb-4 mt-5">
                                       <p className="text-sm text-gray-500 mb-3">
                                         この工程の納品ファイル
                                       </p>
@@ -1293,7 +1722,7 @@ export default function RequestDetail() {
                                     </div>
                                   )}
 
-                                  {step.status === 'open' && (
+                                  {step.status === 'open' && !canApplyThisStep && !isClient && !myApplication && (
                                     <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-2xl text-sm text-blue-700">
                                       この工程はまだ募集中です。
                                     </div>
@@ -1495,7 +1924,7 @@ export default function RequestDetail() {
             <div className="space-y-4 pt-6 border-t">
               {hasOrderSteps && (
                 <div className="p-5 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-600 leading-7">
-                  工程付き依頼です。工程ごとの受注・納品・検収・評価が有効化されています。
+                  工程付き依頼です。工程ごとの応募・選考・納品・検収・評価が有効化されています。
                 </div>
               )}
 
