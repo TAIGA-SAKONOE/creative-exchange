@@ -366,14 +366,6 @@ const today = useMemo(() => {
       return false
     }
 
-if (step.budget.trim() !== '') {
-  const budgetValue = Number(step.budget)
-  if (!Number.isFinite(budgetValue) || budgetValue < 0) {
-    alert(`${label}の予算は0以上の数値で入力してください`)
-    return false
-  }
-}
-
 if (step.deadline && step.deadline < today) {
   alert(`${label}の納期には今日以降の日付を選択してください`)
   return false
@@ -384,45 +376,50 @@ if (step.deadline && step.deadline < today) {
       return false
     }
 
-    for (let i = 0; i < steps.length; i++) {
-      const step = steps[i]
-      const label = `工程${i + 1}`
+   for (let i = 0; i < steps.length; i++) {
+  const step = steps[i]
+  const label = `工程${i + 1}`
 
-      if (!step.title.trim()) {
-        alert(`${label}の工程タイトルを入力してください`)
-        return false
-      }
+  if (!step.title.trim()) {
+    alert(`${label}の工程タイトルを入力してください`)
+    return false
+  }
 
-      if (!step.category_id) {
-        alert(`${label}の必要カテゴリを選択してください`)
-        return false
-      }
+  if (!step.category_id) {
+    alert(`${label}の必要カテゴリを選択してください`)
+    return false
+  }
 
-      if (step.budget.trim() !== '') {
-        const budgetValue = Number(step.budget)
-        if (!Number.isFinite(budgetValue) || budgetValue < 0) {
-          alert(`${label}の予算は0以上の数値で入力してください`)
-          return false
-        }
-      }
-
-      if (step.parallel_group.trim() !== '') {
-        const groupValue = Number(step.parallel_group)
-        if (
-          !Number.isInteger(groupValue) ||
-          groupValue < 1 ||
-          groupValue > 5
-        ) {
-          alert(`${label}の並行グループは1〜5の範囲で選択してください`)
-          return false
-        }
-      }
-
-      if (isNamedRequest && !step.named_creator?.id) {
-        alert(`${label}の指名クリエイターを選択してください`)
-        return false
-      }
+  if (step.budget.trim() !== '') {
+    const budgetValue = Number(step.budget)
+    if (!Number.isFinite(budgetValue) || budgetValue < 0) {
+      alert(`${label}の予算は0以上の数値で入力してください`)
+      return false
     }
+  }
+
+  if (step.deadline && step.deadline < today) {
+    alert(`${label}の納期には今日以降の日付を選択してください`)
+    return false
+  }
+
+  if (step.parallel_group.trim() !== '') {
+    const groupValue = Number(step.parallel_group)
+    if (
+      !Number.isInteger(groupValue) ||
+      groupValue < 1 ||
+      groupValue > 5
+    ) {
+      alert(`${label}の並行グループは1〜5の範囲で選択してください`)
+      return false
+    }
+  }
+
+  if (isNamedRequest && !step.named_creator?.id) {
+    alert(`${label}の指名クリエイターを選択してください`)
+    return false
+  }
+}
 
     return true
   }
