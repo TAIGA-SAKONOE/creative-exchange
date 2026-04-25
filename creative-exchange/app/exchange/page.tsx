@@ -244,48 +244,55 @@ function ExchangePageContent() {
 
         setCreators(filteredCreatorRows)
 
-        const { data: categoryLinks, error: categoryLinksError } = await supabase
-          .from('user_categories')
-          .select(`
-            user_id,
-            category_id,
-            categories(name)
-          `)
+        // user_categories が未設定でも、クリエイター本体は表示する
+        const creatorIds = filteredCreatorRows.map((creator) => creator.id)
 
-        if (categoryLinksError) {
-          setError(categoryLinksError.message || 'クリエイター品目の取得に失敗しました')
-          setLoading(false)
-          return
-        }
+        if (creatorIds.length === 0) {
+          setCreatorCategoryMap({})
+        } else {
+          const { data: categoryLinks, error: categoryLinksError } = await supabase
+            .from('user_categories')
+            .select(`
+              user_id,
+              category_id,
+              categories(name)
+            `)
+            .in('user_id', creatorIds)
 
-        const nextMap: CreatorCategoryMap = {}
-
-        ;(categoryLinks || []).forEach((row: any) => {
-          const userId = row.user_id
-          const categoryId = row.category_id
-
-          let categoryName: string | null = null
-
-          if (Array.isArray(row.categories)) {
-            categoryName = row.categories[0]?.name || null
+          if (categoryLinksError) {
+            console.error('クリエイター品目の取得に失敗しました', categoryLinksError)
+            setCreatorCategoryMap({})
           } else {
-            categoryName = row.categories?.name || null
-          }
+            const nextMap: CreatorCategoryMap = {}
 
-          if (!nextMap[userId]) {
-            nextMap[userId] = { ids: [], names: [] }
-          }
+            ;(categoryLinks || []).forEach((row: any) => {
+              const userId = row.user_id
+              const categoryId = row.category_id
 
-          if (!nextMap[userId].ids.includes(categoryId)) {
-            nextMap[userId].ids.push(categoryId)
-          }
+              let categoryName: string | null = null
 
-          if (categoryName && !nextMap[userId].names.includes(categoryName)) {
-            nextMap[userId].names.push(categoryName)
-          }
-        })
+              if (Array.isArray(row.categories)) {
+                categoryName = row.categories[0]?.name || null
+              } else {
+                categoryName = row.categories?.name || null
+              }
 
-        setCreatorCategoryMap(nextMap)
+              if (!nextMap[userId]) {
+                nextMap[userId] = { ids: [], names: [] }
+              }
+
+              if (!nextMap[userId].ids.includes(categoryId)) {
+                nextMap[userId].ids.push(categoryId)
+              }
+
+              if (categoryName && !nextMap[userId].names.includes(categoryName)) {
+                nextMap[userId].names.push(categoryName)
+              }
+            })
+
+            setCreatorCategoryMap(nextMap)
+          }
+        }
 
         const { data: listingRows, error: listingsError } = await supabase
           .from('product_listings')
