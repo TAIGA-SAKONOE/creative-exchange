@@ -270,7 +270,7 @@ export default function MyPage() {
               まだ通知はありません
             </div>
           ) : (
-            <div className="grid gap-4">
+            <div className="max-h-[420px] overflow-y-auto pr-2 grid gap-4">
               {notifications.map((notification) => (
                 <Link
                   key={notification.id}
@@ -314,7 +314,7 @@ export default function MyPage() {
               「新しい依頼を作成」から初めてみましょう
             </div>
           ) : (
-            <div className="grid gap-6">
+            <div className="max-h-[520px] overflow-y-auto pr-2 grid gap-6">
               {requests.map((req) => (
                 <Link
                   key={req.id}
@@ -364,7 +364,7 @@ export default function MyPage() {
               Exchange から公開依頼を探してみましょう
             </div>
           ) : (
-            <div className="grid gap-6">
+            <div className="max-h-[520px] overflow-y-auto pr-2 grid gap-6">
               {receivedOrders.map((order) => (
                 <Link
                   key={order.id}
@@ -425,7 +425,7 @@ export default function MyPage() {
               「作品を出品する」から既製品を登録できます
             </div>
           ) : (
-            <div className="grid gap-6">
+            <div className="max-h-[520px] overflow-y-auto pr-2 grid gap-6">
               {productListings.map((listing) => {
                 const imageUrl = getFirstImage(listing.image_urls)
 
@@ -498,7 +498,7 @@ export default function MyPage() {
               作品マーケットから既製品を探してみましょう
             </div>
           ) : (
-            <div className="grid gap-6">
+            <div className="max-h-[420px] overflow-y-auto pr-2 grid gap-6">
               {productPurchases.map((purchase) => {
                 const listing = Array.isArray(purchase.product_listings)
                   ? purchase.product_listings[0]
