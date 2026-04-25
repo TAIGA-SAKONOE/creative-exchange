@@ -474,7 +474,11 @@ export default function RequestDetail() {
     isCreator && ['matched', 'in_progress', 'revision'].includes(request.status)
   const canComplete = isClient && request.status === 'delivered'
   const canReview = (isClient || isCreator) && request.status === 'completed'
-  const canMessage = request.status === 'open' || isClient || isCreator
+  const canMessage =
+  request.status === 'open' ||
+  request.status === 'draft' ||
+  isClient ||
+  isCreator
   const canEdit = isClient && ['draft', 'open'].includes(request.status)
   const canCancel =
     (isClient || isCreator) &&
