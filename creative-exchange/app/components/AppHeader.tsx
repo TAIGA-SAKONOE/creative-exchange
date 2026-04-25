@@ -8,6 +8,8 @@ import { useEffect, useState } from 'react'
 export default function AppHeader() {
   const router = useRouter()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [exchangeOpen, setExchangeOpen] = useState(false)
+  const [marketOpen, setMarketOpen] = useState(false)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -15,6 +17,7 @@ export default function AppHeader() {
       const {
         data: { user },
       } = await supabase.auth.getUser()
+
       setIsLoggedIn(!!user)
     }
 
@@ -27,71 +30,143 @@ export default function AppHeader() {
     router.replace('/login')
   }
 
+  const closeDropdowns = () => {
+    setExchangeOpen(false)
+    setMarketOpen(false)
+  }
+
   return (
     <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/90 backdrop-blur">
       <div className="max-w-6xl mx-auto px-4">
         <div className="py-3 md:py-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <Link href="/" className="text-2xl md:text-xl font-bold tracking-tight">
+            <Link
+              href="/"
+              className="text-2xl md:text-xl font-bold tracking-tight"
+              onClick={closeDropdowns}
+            >
               Creative Exchange
             </Link>
 
-            <nav className="grid grid-cols-2 md:flex md:flex-wrap gap-2 md:gap-3 text-sm">
-              <Link
-                href="/exchange?tab=creators"
-                className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-center"
+            <nav className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3 text-sm">
+              <div
+                className="relative"
+                onMouseEnter={() => setExchangeOpen(true)}
+                onMouseLeave={() => setExchangeOpen(false)}
               >
-                人を探す
-              </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExchangeOpen((prev) => !prev)
+                    setMarketOpen(false)
+                  }}
+                  className="w-full md:w-auto px-3 py-2 rounded-xl hover:bg-gray-100 transition text-left md:text-center inline-flex items-center justify-between gap-2"
+                >
+                  <span>Exchange</span>
+                  <span className="text-xs text-gray-500">▼</span>
+                </button>
 
-              <Link
-                href="/listing"
-                className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-center"
-              >
-                作品を探す
-              </Link>
+                {exchangeOpen && (
+                  <div className="md:absolute md:left-0 md:top-full md:pt-2 w-full md:w-52 z-50">
+                    <div className="bg-white border border-gray-200 rounded-2xl shadow-xl p-2">
+                      <Link
+                        href="/exchange?tab=requests"
+                        onClick={closeDropdowns}
+                        className="block px-4 py-3 rounded-xl hover:bg-gray-100 transition"
+                      >
+                        依頼を探す
+                      </Link>
 
-              <Link
-                href="/exchange?tab=requests"
-                className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-center"
-              >
-                依頼を受ける
-              </Link>
+                      <Link
+                        href="/exchange?tab=creators"
+                        onClick={closeDropdowns}
+                        className="block px-4 py-3 rounded-xl hover:bg-gray-100 transition"
+                      >
+                        人を探す
+                      </Link>
 
-              <Link
-                href="/listing/new"
-                className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-center"
-              >
-                出品する
-              </Link>
+                      <Link
+                        href="/listing"
+                        onClick={closeDropdowns}
+                        className="block px-4 py-3 rounded-xl hover:bg-gray-100 transition"
+                      >
+                        作品を探す
+                      </Link>
 
-              <Link
-                href="/market"
-                className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-center"
+                      <Link
+                        href="/listing/new"
+                        onClick={closeDropdowns}
+                        className="block px-4 py-3 rounded-xl hover:bg-gray-100 transition"
+                      >
+                        出品する
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div
+                className="relative"
+                onMouseEnter={() => setMarketOpen(true)}
+                onMouseLeave={() => setMarketOpen(false)}
               >
-                相場を確認する
-              </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMarketOpen((prev) => !prev)
+                    setExchangeOpen(false)
+                  }}
+                  className="w-full md:w-auto px-3 py-2 rounded-xl hover:bg-gray-100 transition text-left md:text-center inline-flex items-center justify-between gap-2"
+                >
+                  <span>相場ボード</span>
+                  <span className="text-xs text-gray-500">▼</span>
+                </button>
+
+                {marketOpen && (
+                  <div className="md:absolute md:left-0 md:top-full md:pt-2 w-full md:w-60 z-50">
+                    <div className="bg-white border border-gray-200 rounded-2xl shadow-xl p-2">
+                      <Link
+                        href="/market?tab=commission"
+                        onClick={closeDropdowns}
+                        className="block px-4 py-3 rounded-xl hover:bg-gray-100 transition"
+                      >
+                        受託相場を確認する
+                      </Link>
+
+                      <Link
+                        href="/market?tab=product"
+                        onClick={closeDropdowns}
+                        className="block px-4 py-3 rounded-xl hover:bg-gray-100 transition"
+                      >
+                        作品相場を確認する
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {isLoggedIn && (
+                <Link
+                  href="/mypage"
+                  onClick={closeDropdowns}
+                  className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-left md:text-center"
+                >
+                  マイページ
+                </Link>
+              )}
 
               {isLoggedIn ? (
-                <>
-                  <Link
-                    href="/mypage"
-                    className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-center"
-                  >
-                    マイページ
-                  </Link>
-
-                  <button
-                    onClick={handleLogout}
-                    className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-gray-700 text-center col-span-2 md:col-span-1"
-                  >
-                    ログアウト
-                  </button>
-                </>
+                <button
+                  onClick={handleLogout}
+                  className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-gray-700 text-left md:text-center"
+                >
+                  ログアウト
+                </button>
               ) : (
                 <Link
                   href="/login"
-                  className="px-3 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition text-center"
+                  onClick={closeDropdowns}
+                  className="px-3 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition text-left md:text-center"
                 >
                   ログイン
                 </Link>
