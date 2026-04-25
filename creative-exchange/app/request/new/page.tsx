@@ -56,7 +56,9 @@ function NewRequestContent() {
   const [description, setDescription] = useState('')
   const [steps, setSteps] = useState<RequestStepInput[]>([createEmptyStep(0)])
 
-  const [marketStats, setMarketStats] = useState<MarketStatRow | null>(null)
+  const [stepMarketStats, setStepMarketStats] = useState<
+    Record<number, MarketStatRow | null>
+  >({})
   const [directedCreator, setDirectedCreator] = useState<DirectedCreator | null>(null)
 
   const [loading, setLoading] = useState(true)
@@ -65,8 +67,6 @@ function NewRequestContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const creatorIdParam = searchParams.get('creator_id')
-
-  const primaryCategoryId = steps[0]?.category_id || ''
 
   const isMultiStep = steps.length >= 2
 
@@ -137,42 +137,49 @@ function NewRequestContent() {
   }, [router, creatorIdParam])
 
   useEffect(() => {
-    const fetchMarketStats = async () => {
-      if (!primaryCategoryId) {
-        setMarketStats(null)
-        return
-      }
-
+    const fetchStepMarketStats = async () => {
       const supabase = createClient()
+      const nextStats: Record<number, MarketStatRow | null> = {}
 
-      const { data, error } = await supabase.rpc('calculate_market_stats', {
-        p_category_id: parseInt(primaryCategoryId, 10),
-        p_days: 90,
-      })
+      await Promise.all(
+        steps.map(async (step, index) => {
+          if (!step.category_id) {
+            nextStats[index] = null
+            return
+          }
 
-      if (error) {
-        console.error('相場取得エラー:', error)
-        setMarketStats(null)
-        return
-      }
+          const { data, error } = await supabase.rpc('calculate_market_stats', {
+            p_category_id: parseInt(step.category_id, 10),
+            p_days: 90,
+          })
 
-      const stats: MarketStatRow =
-        Array.isArray(data) && data.length > 0
-          ? data[0]
-          : {
-              median_price: null,
-              avg_price: null,
-              p25_price: null,
-              p75_price: null,
-              transaction_count: 0,
-              confidence_label: '参考値',
-            }
+          if (error) {
+            console.error(`工程${index + 1}の相場取得エラー:`, error)
+            nextStats[index] = null
+            return
+          }
 
-      setMarketStats(stats)
+          const stats: MarketStatRow =
+            Array.isArray(data) && data.length > 0
+              ? data[0]
+              : {
+                  median_price: null,
+                  avg_price: null,
+                  p25_price: null,
+                  p75_price: null,
+                  transaction_count: 0,
+                  confidence_label: '参考値',
+                }
+
+          nextStats[index] = stats
+        })
+      )
+
+      setStepMarketStats(nextStats)
     }
 
-    fetchMarketStats()
-  }, [primaryCategoryId])
+    fetchStepMarketStats()
+  }, [steps])
 
   const updateStep = (
     index: number,
@@ -598,52 +605,61 @@ function NewRequestContent() {
                       </div>
                     </div>
 
-                    {index === 0 && marketStats && step.category_id && (
-                      <div className="mt-5 bg-blue-50 border border-blue-200 rounded-2xl p-5">
-                        <p className="text-sm text-blue-600 font-medium mb-3">
-                          工程1の品目相場（直近90日間）
-                        </p>
+                    {step.category_id &&
+                      stepMarketStats[index] &&
+                      (() => {
+                        const stats = stepMarketStats[index]
+                        if (!stats) return null
 
-                        {marketStats.transaction_count >= 5 ? (
-                          <div className="grid grid-cols-3 gap-4 text-center">
-                            <div>
-                              <p className="text-xs text-gray-500">取引件数</p>
-                              <p className="text-lg font-semibold">
-                                {marketStats.transaction_count}件
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-500">中央値</p>
-                              <p className="text-xl font-bold text-blue-600">
-                                ¥
-                                {Math.round(
-                                  marketStats.median_price ?? 0
-                                ).toLocaleString()}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-500">価格帯</p>
-                              <p className="text-sm">
-                                ¥
-                                {Math.round(
-                                  marketStats.p25_price ?? 0
-                                ).toLocaleString()}
-                                〜 ¥
-                                {Math.round(
-                                  marketStats.p75_price ?? 0
-                                ).toLocaleString()}
-                              </p>
-                            </div>
+                        return (
+                          <div className="mt-5 bg-blue-50 border border-blue-200 rounded-2xl p-5">
+                            <p className="text-sm text-blue-600 font-medium mb-3">
+                              工程{index + 1}の品目相場（直近90日間）
+                            </p>
+
+                            {stats.transaction_count >= 5 ? (
+                              <div className="grid grid-cols-3 gap-4 text-center">
+                                <div>
+                                  <p className="text-xs text-gray-500">取引件数</p>
+                                  <p className="text-lg font-semibold">
+                                    {stats.transaction_count}件
+                                  </p>
+                                </div>
+
+                                <div>
+                                  <p className="text-xs text-gray-500">中央値</p>
+                                  <p className="text-xl font-bold text-blue-600">
+                                    ¥
+                                    {Math.round(
+                                      stats.median_price ?? 0
+                                    ).toLocaleString()}
+                                  </p>
+                                </div>
+
+                                <div>
+                                  <p className="text-xs text-gray-500">価格帯</p>
+                                  <p className="text-sm">
+                                    ¥
+                                    {Math.round(
+                                      stats.p25_price ?? 0
+                                    ).toLocaleString()}
+                                    〜 ¥
+                                    {Math.round(
+                                      stats.p75_price ?? 0
+                                    ).toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-center text-gray-500 py-4">
+                                データ不足です
+                                <br />
+                                5件以上の取引が蓄積されると表示されます
+                              </div>
+                            )}
                           </div>
-                        ) : (
-                          <div className="text-center text-gray-500 py-4">
-                            データ不足です
-                            <br />
-                            5件以上の取引が蓄積されると表示されます
-                          </div>
-                        )}
-                      </div>
-                    )}
+                        )
+                      })()}
                   </div>
                 ))}
               </div>
