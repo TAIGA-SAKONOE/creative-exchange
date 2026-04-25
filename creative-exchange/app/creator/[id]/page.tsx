@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import LoadingState from '../../components/LoadingState'
 import MessageState from '../../components/MessageState'
+import Link from 'next/link'
 
 type ProductSalesSummary = {
   category_id: number | null
@@ -18,14 +19,25 @@ type ProductSalesSummary = {
   max_price: number
 }
 
+type CreatorCategory = {
+  category_id: number
+  category_name: string
+}
+
 export default function CreatorProfile() {
   const params = useParams()
   const creatorId = params.id as string
+
   const [creator, setCreator] = useState<any>(null)
+  const [currentUserProfile, setCurrentUserProfile] = useState<any>(null)
+  const [creatorCategories, setCreatorCategories] = useState<CreatorCategory[]>([])
+  const [consultationCategoryId, setConsultationCategoryId] = useState<number | null>(null)
   const [personalPrices, setPersonalPrices] = useState<any[]>([])
   const [productSales, setProductSales] = useState<ProductSalesSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [creatingConsultation, setCreatingConsultation] = useState(false)
+
   const router = useRouter()
 
   useEffect(() => {
@@ -35,6 +47,22 @@ export default function CreatorProfile() {
         setError(null)
 
         const supabase = createClient()
+
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser()
+
+        if (authUser) {
+          const { data: myProfile } = await supabase
+            .from('users')
+            .select('id, display_name')
+            .eq('auth_id', authUser.id)
+            .single()
+
+          if (myProfile) {
+            setCurrentUserProfile(myProfile)
+          }
+        }
 
         const { data: profile, error: profileError } = await supabase
           .from('users')
@@ -49,6 +77,47 @@ export default function CreatorProfile() {
         }
 
         setCreator(profile)
+
+        const { data: categoryLinks, error: categoryLinksError } = await supabase
+          .from('user_categories')
+          .select(`
+            category_id,
+            categories(name)
+          `)
+          .eq('user_id', creatorId)
+
+        if (categoryLinksError) {
+          console.error('クリエイター品目取得エラー', categoryLinksError)
+        }
+
+        const normalizedCategories: CreatorCategory[] = (categoryLinks || []).map((row: any) => {
+          let categoryName = '未分類'
+
+          if (Array.isArray(row.categories)) {
+            categoryName = row.categories[0]?.name || '未分類'
+          } else if (row.categories?.name) {
+            categoryName = row.categories.name
+          }
+
+          return {
+            category_id: row.category_id,
+            category_name: categoryName,
+          }
+        })
+
+        setCreatorCategories(normalizedCategories)
+
+        if (normalizedCategories.length > 0) {
+          setConsultationCategoryId(normalizedCategories[0].category_id)
+        } else {
+          const { data: fallbackCategories } = await supabase
+            .from('categories')
+            .select('id')
+            .order('name', { ascending: true })
+            .limit(1)
+
+          setConsultationCategoryId(fallbackCategories?.[0]?.id || null)
+        }
 
         const { data: prices, error: pricesError } = await supabase.rpc(
           'calculate_personal_prices',
@@ -187,6 +256,62 @@ export default function CreatorProfile() {
     return productSales.filter((item) => item.sales_count >= 1)
   }, [productSales])
 
+  const handleCreateConsultation = async () => {
+    if (!creator) return
+
+    if (!currentUserProfile?.id) {
+      router.push('/login')
+      return
+    }
+
+    if (String(currentUserProfile.id) === String(creatorId)) {
+      alert('自分自身には相談できません')
+      return
+    }
+
+    if (!consultationCategoryId) {
+      alert('相談用の品目を設定できませんでした。クリエイターの品目設定を確認してください。')
+      return
+    }
+
+    setCreatingConsultation(true)
+
+    try {
+      const supabase = createClient()
+
+      const creatorName = creator.display_name || 'クリエイター'
+
+      const { data: newOrder, error: insertError } = await supabase
+        .from('orders')
+        .insert({
+          client_id: currentUserProfile.id,
+          creator_id: creatorId,
+          category_id: consultationCategoryId,
+          title: `${creatorName}への事前相談`,
+          description:
+            '事前相談用の下書きです。依頼内容・予算・納期などをチャットで相談してください。',
+          agreed_price: null,
+          deadline: null,
+          specification: {
+            type: 'creator_consultation',
+            creator_id: creatorId,
+          },
+          status: 'draft',
+        })
+        .select('id')
+        .single()
+
+      if (insertError) throw insertError
+      if (!newOrder?.id) throw new Error('相談用依頼の作成に失敗しました')
+
+      router.push(`/request/${newOrder.id}`)
+    } catch (err: any) {
+      alert('相談の開始に失敗しました: ' + err.message)
+    } finally {
+      setCreatingConsultation(false)
+    }
+  }
+
   if (loading) {
     return <LoadingState message="クリエイター情報を読み込み中..." />
   }
@@ -210,6 +335,10 @@ export default function CreatorProfile() {
     )
   }
 
+  const creatorName = creator.display_name || 'クリエイター'
+  const isOwnProfile =
+    currentUserProfile?.id && String(currentUserProfile.id) === String(creatorId)
+
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-4xl mx-auto px-4">
@@ -222,20 +351,61 @@ export default function CreatorProfile() {
 
         <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
           <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-10 text-white">
-            <div className="flex items-center gap-6">
-              <div className="w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center text-5xl">
-                👤
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
+              <div className="flex items-center gap-6">
+                <div className="w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center text-5xl">
+                  👤
+                </div>
+                <div>
+                  <h1 className="text-4xl font-bold">{creatorName}</h1>
+                  <p className="text-xl opacity-90">
+                    @{creator.twitter_handle || 'no handle'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-4xl font-bold">{creator.display_name}</h1>
-                <p className="text-xl opacity-90">
-                  @{creator.twitter_handle || 'no handle'}
-                </p>
-              </div>
+
+              {!isOwnProfile && (
+                <div className="w-full md:w-72 space-y-3">
+                  <button
+                    onClick={handleCreateConsultation}
+                    disabled={creatingConsultation}
+                    className="w-full bg-white text-blue-700 hover:bg-blue-50 disabled:bg-gray-200 disabled:text-gray-500 py-4 rounded-2xl font-bold shadow-sm transition"
+                  >
+                    {creatingConsultation
+                      ? '相談を作成中...'
+                      : 'このクリエイターに相談する'}
+                  </button>
+
+                  <Link
+                    href={`/request/new?creator_id=${creatorId}`}
+                    className="block w-full text-center bg-blue-900/40 hover:bg-blue-900/60 text-white border border-white/30 py-4 rounded-2xl font-bold transition"
+                  >
+                    このクリエイターに依頼する
+                  </Link>
+                </div>
+              )}
             </div>
+
             {creator.bio && (
               <p className="mt-6 text-lg opacity-90 max-w-2xl">{creator.bio}</p>
             )}
+
+            <div className="mt-6 flex flex-wrap gap-2">
+              {creatorCategories.length > 0 ? (
+                creatorCategories.map((category) => (
+                  <span
+                    key={category.category_id}
+                    className="inline-flex px-3 py-1.5 rounded-full bg-white/20 text-white text-sm border border-white/20"
+                  >
+                    {category.category_name}
+                  </span>
+                ))
+              ) : (
+                <span className="inline-flex px-3 py-1.5 rounded-full bg-white/20 text-white text-sm border border-white/20">
+                  品目未設定
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="p-10">
@@ -349,6 +519,27 @@ export default function CreatorProfile() {
                 </div>
               )}
             </div>
+
+            {!isOwnProfile && (
+              <div className="border-t pt-10 mt-12 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                  onClick={handleCreateConsultation}
+                  disabled={creatingConsultation}
+                  className="w-full bg-gray-900 hover:bg-black disabled:bg-gray-400 text-white py-4 rounded-2xl font-bold transition"
+                >
+                  {creatingConsultation
+                    ? '相談を作成中...'
+                    : 'このクリエイターに相談する'}
+                </button>
+
+                <Link
+                  href={`/request/new?creator_id=${creatorId}`}
+                  className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold transition"
+                >
+                  このクリエイターに依頼する
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>
