@@ -3,15 +3,39 @@
 import LoadingState from '../../components/LoadingState'
 import MessageState from '../../components/MessageState'
 import { createClient } from '../../../lib/supabase/client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+
+type OrderStep = {
+  id: string
+  order_id: string
+  step_number: number
+  title: string
+  description: string | null
+  required_category_id: number | null
+  budget: number | null
+  deadline: string | null
+  creator_id: string | null
+  status: string
+  created_at: string | null
+  updated_at: string | null
+  categories?: { name: string } | { name: string }[] | null
+  users?: {
+    display_name: string | null
+    twitter_handle: string | null
+  } | {
+    display_name: string | null
+    twitter_handle: string | null
+  }[] | null
+}
 
 export default function RequestDetail() {
   const params = useParams()
   const id = params.id as string
 
   const [request, setRequest] = useState<any>(null)
+  const [orderSteps, setOrderSteps] = useState<OrderStep[]>([])
   const [deliverables, setDeliverables] = useState<any[]>([])
   const [messages, setMessages] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -114,6 +138,26 @@ export default function RequestDetail() {
       }
 
       setRequest(orderData)
+
+      const { data: stepRows, error: stepsError } = await supabase
+        .from('order_steps')
+        .select(`
+          *,
+          categories (name),
+          users (
+            display_name,
+            twitter_handle
+          )
+        `)
+        .eq('order_id', id)
+        .order('step_number', { ascending: true })
+
+      if (stepsError) {
+        console.error('order_steps取得エラー', stepsError)
+        setOrderSteps([])
+      } else {
+        setOrderSteps((stepRows ?? []) as unknown as OrderStep[])
+      }
 
       const { data: files, error: filesError } = await supabase
         .from('deliverables')
@@ -311,18 +355,18 @@ export default function RequestDetail() {
 
       let targetUserId: string | null = null
 
-      if (request.status === 'open') {
-        if (String(request.client_id) === String(profile.id)) {
-          targetUserId = request.creator_id || null
-        } else {
-          targetUserId = request.client_id
+      if (String(request.client_id) === String(profile.id)) {
+        targetUserId = request.creator_id || null
+
+        if (!targetUserId && orderSteps.length > 0) {
+          const assignedCreatorIds = orderSteps
+            .map((step) => step.creator_id)
+            .filter(Boolean) as string[]
+
+          targetUserId = assignedCreatorIds[0] || null
         }
       } else {
-        if (String(request.client_id) === String(profile.id)) {
-          targetUserId = request.creator_id || null
-        } else {
-          targetUserId = request.client_id
-        }
+        targetUserId = request.client_id
       }
 
       if (targetUserId) {
@@ -443,6 +487,99 @@ export default function RequestDetail() {
     }
   }
 
+  const getStepCategoryName = (step: OrderStep) => {
+    const category = step.categories
+
+    if (!category) return '未分類'
+
+    if (Array.isArray(category)) {
+      return category[0]?.name || '未分類'
+    }
+
+    return category.name || '未分類'
+  }
+
+  const getStepCreatorName = (step: OrderStep) => {
+    const creator = step.users
+
+    if (!creator) return null
+
+    if (Array.isArray(creator)) {
+      return creator[0]?.display_name || creator[0]?.twitter_handle || null
+    }
+
+    return creator.display_name || creator.twitter_handle || null
+  }
+
+  const getStepStatusMeta = (status: string) => {
+    if (status === 'open') {
+      return {
+        label: '募集中',
+        shortLabel: '募集中',
+        dotClass: 'bg-blue-600 border-blue-600 text-white',
+        badgeClass: 'bg-blue-50 text-blue-700 border border-blue-100',
+        lineClass: 'bg-blue-200',
+      }
+    }
+
+    if (status === 'matched') {
+      return {
+        label: '制作中',
+        shortLabel: '制作中',
+        dotClass: 'bg-purple-600 border-purple-600 text-white',
+        badgeClass: 'bg-purple-50 text-purple-700 border border-purple-100',
+        lineClass: 'bg-purple-200',
+      }
+    }
+
+    if (status === 'delivered') {
+      return {
+        label: '納品済み',
+        shortLabel: '納品',
+        dotClass: 'bg-orange-500 border-orange-500 text-white',
+        badgeClass: 'bg-orange-50 text-orange-700 border border-orange-100',
+        lineClass: 'bg-orange-200',
+      }
+    }
+
+    if (status === 'completed') {
+      return {
+        label: '完了',
+        shortLabel: '完了',
+        dotClass: 'bg-green-600 border-green-600 text-white',
+        badgeClass: 'bg-green-50 text-green-700 border border-green-100',
+        lineClass: 'bg-green-200',
+      }
+    }
+
+    if (status === 'cancelled') {
+      return {
+        label: 'キャンセル',
+        shortLabel: '中止',
+        dotClass: 'bg-gray-400 border-gray-400 text-white',
+        badgeClass: 'bg-gray-100 text-gray-600 border border-gray-200',
+        lineClass: 'bg-gray-200',
+      }
+    }
+
+    return {
+      label: status,
+      shortLabel: status,
+      dotClass: 'bg-gray-300 border-gray-300 text-white',
+      badgeClass: 'bg-gray-100 text-gray-600 border border-gray-200',
+      lineClass: 'bg-gray-200',
+    }
+  }
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return null
+
+    const date = new Date(dateString)
+    if (Number.isNaN(date.getTime())) return dateString
+
+    return date.toLocaleDateString('ja-JP')
+  }
+
   if (loading) {
     return <LoadingState message="依頼詳細を読み込み中..." />
   }
@@ -466,20 +603,52 @@ export default function RequestDetail() {
     )
   }
 
+  const hasOrderSteps = orderSteps.length > 0
+
   const isClient = profile?.id && String(request.client_id) === String(profile.id)
   const isCreator = profile?.id && String(request.creator_id) === String(profile.id)
+  const isStepCreator =
+    profile?.id &&
+    orderSteps.some((step) => String(step.creator_id) === String(profile.id))
 
-  const canAccept = request.status === 'open' && !isClient && !request.creator_id
+  const completedSteps = orderSteps.filter((step) => step.status === 'completed').length
+  const deliveredSteps = orderSteps.filter((step) => step.status === 'delivered').length
+  const matchedSteps = orderSteps.filter((step) => step.status === 'matched').length
+  const openSteps = orderSteps.filter((step) => step.status === 'open').length
+  const cancelledSteps = orderSteps.filter((step) => step.status === 'cancelled').length
+
+  const progressPercent =
+    orderSteps.length > 0
+      ? Math.round((completedSteps / orderSteps.length) * 100)
+      : 0
+
+  const canAccept =
+    !hasOrderSteps &&
+    request.status === 'open' &&
+    !isClient &&
+    !request.creator_id
+
   const canDeliver =
-    isCreator && ['matched', 'in_progress', 'revision'].includes(request.status)
-  const canComplete = isClient && request.status === 'delivered'
-  const canReview = (isClient || isCreator) && request.status === 'completed'
+    !hasOrderSteps &&
+    isCreator &&
+    ['matched', 'in_progress', 'revision'].includes(request.status)
+
+  const canComplete =
+    !hasOrderSteps &&
+    isClient &&
+    request.status === 'delivered'
+
+  const canReview = (isClient || isCreator || isStepCreator) && request.status === 'completed'
+
   const canMessage =
-  request.status === 'open' ||
-  request.status === 'draft' ||
-  isClient ||
-  isCreator
+    request.status === 'open' ||
+    request.status === 'draft' ||
+    isClient ||
+    isCreator ||
+    isStepCreator
+
   const canEdit = isClient && ['draft', 'open'].includes(request.status)
+
   const canCancel =
     (isClient || isCreator) &&
     ['open', 'matched', 'in_progress', 'revision'].includes(request.status)
@@ -488,7 +657,11 @@ export default function RequestDetail() {
     request.status === 'draft'
       ? '下書き'
       : request.status === 'open'
-        ? '公開中'
+        ? hasOrderSteps
+          ? openSteps > 0
+            ? '公開中'
+            : '工程進行中'
+          : '公開中'
         : request.status === 'matched'
           ? '受注済み'
           : request.status === 'in_progress'
@@ -505,7 +678,7 @@ export default function RequestDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
-      <div className="max-w-3xl mx-auto px-4">
+      <div className="max-w-4xl mx-auto px-4">
         <button
           onClick={() => router.push('/mypage')}
           className="mb-8 text-gray-500 hover:text-gray-700 flex items-center gap-2"
@@ -519,7 +692,14 @@ export default function RequestDetail() {
               <div>
                 <h1 className="text-4xl font-bold mb-2">{request.title}</h1>
                 <p className="text-xl opacity-90">{request.categories?.name}</p>
+
+                {hasOrderSteps && (
+                  <p className="mt-4 text-sm opacity-90">
+                    全{orderSteps.length}工程・完了{completedSteps}工程・募集中{openSteps}工程
+                  </p>
+                )}
               </div>
+
               <div className="px-6 py-2 rounded-full text-sm font-medium bg-white/20 backdrop-blur-sm whitespace-nowrap">
                 {statusLabel}
               </div>
@@ -555,9 +735,11 @@ export default function RequestDetail() {
               </p>
             </div>
 
-            {request.agreed_price && (
+            {request.agreed_price !== null && Number(request.agreed_price) > 0 && (
               <div className="mb-10 p-6 bg-gray-50 rounded-2xl">
-                <p className="text-sm text-gray-500 mb-1">希望予算</p>
+                <p className="text-sm text-gray-500 mb-1">
+                  {hasOrderSteps ? '合計予算' : '希望予算'}
+                </p>
                 <p className="text-4xl font-bold text-blue-600">
                   ¥{Number(request.agreed_price).toLocaleString()}
                 </p>
@@ -570,7 +752,9 @@ export default function RequestDetail() {
 
                 return (
                   <div className={`mb-10 p-6 rounded-2xl ${deadlineMeta.containerClass}`}>
-                    <p className={`text-sm mb-1 ${deadlineMeta.labelClass}`}>希望納期</p>
+                    <p className={`text-sm mb-1 ${deadlineMeta.labelClass}`}>
+                      {hasOrderSteps ? '最終納期' : '希望納期'}
+                    </p>
                     <p className={`text-2xl font-bold ${deadlineMeta.dateClass}`}>
                       {deadlineMeta.formattedDate}
                     </p>
@@ -580,6 +764,140 @@ export default function RequestDetail() {
                   </div>
                 )
               })()}
+
+            {hasOrderSteps && (
+              <div className="mb-10">
+                <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold">工程進捗</h2>
+                    <p className="text-sm text-gray-500 mt-2">
+                      各工程の募集・制作・納品・完了状況を確認できます。
+                    </p>
+                  </div>
+
+                  <div className="text-sm text-gray-500">
+                    進捗 {progressPercent}%
+                  </div>
+                </div>
+
+                <div className="mb-6 bg-gray-100 rounded-full h-3 overflow-hidden">
+                  <div
+                    className="h-full bg-blue-600 transition-all"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+                  <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
+                    <p className="text-xs text-blue-600 mb-1">募集中</p>
+                    <p className="text-2xl font-bold text-blue-700">{openSteps}</p>
+                  </div>
+                  <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4">
+                    <p className="text-xs text-purple-600 mb-1">制作中</p>
+                    <p className="text-2xl font-bold text-purple-700">{matchedSteps}</p>
+                  </div>
+                  <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4">
+                    <p className="text-xs text-orange-600 mb-1">納品済み</p>
+                    <p className="text-2xl font-bold text-orange-700">{deliveredSteps}</p>
+                  </div>
+                  <div className="bg-green-50 border border-green-100 rounded-2xl p-4">
+                    <p className="text-xs text-green-600 mb-1">完了</p>
+                    <p className="text-2xl font-bold text-green-700">{completedSteps}</p>
+                  </div>
+                  <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
+                    <p className="text-xs text-gray-500 mb-1">キャンセル</p>
+                    <p className="text-2xl font-bold text-gray-600">{cancelledSteps}</p>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <div className="absolute left-5 top-8 bottom-8 w-0.5 bg-gray-200" />
+
+                  <div className="space-y-6">
+                    {orderSteps.map((step, index) => {
+                      const statusMeta = getStepStatusMeta(step.status)
+                      const creatorName = getStepCreatorName(step)
+                      const deadlineLabel = formatDate(step.deadline)
+
+                      return (
+                        <div key={step.id} className="relative flex gap-5">
+                          <div
+                            className={`relative z-10 w-10 h-10 rounded-full border-2 flex items-center justify-center text-sm font-bold ${statusMeta.dotClass}`}
+                          >
+                            {step.status === 'completed'
+                              ? '✓'
+                              : step.status === 'cancelled'
+                                ? '×'
+                                : step.step_number}
+                          </div>
+
+                          <div className="flex-1 bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
+                            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                  <span className="text-sm text-gray-500">
+                                    工程{step.step_number}
+                                  </span>
+                                  <span
+                                    className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${statusMeta.badgeClass}`}
+                                  >
+                                    {statusMeta.label}
+                                  </span>
+                                  <span className="inline-flex px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium border border-blue-100">
+                                    {getStepCategoryName(step)}
+                                  </span>
+                                </div>
+
+                                <h3 className="text-xl font-bold text-gray-900">
+                                  {step.title}
+                                </h3>
+                              </div>
+
+                              {step.budget !== null && Number(step.budget) > 0 && (
+                                <div className="text-left md:text-right">
+                                  <p className="text-xs text-gray-500 mb-1">工程予算</p>
+                                  <p className="text-lg font-bold text-blue-600">
+                                    ¥{Number(step.budget).toLocaleString()}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+
+                            {step.description && (
+                              <p className="text-gray-700 leading-7 whitespace-pre-wrap mb-4">
+                                {step.description}
+                              </p>
+                            )}
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                              <div className="bg-gray-50 rounded-2xl p-4">
+                                <p className="text-gray-500 mb-1">担当クリエイター</p>
+                                <p className="font-semibold text-gray-900">
+                                  {creatorName || '未定'}
+                                </p>
+                              </div>
+
+                              <div className="bg-gray-50 rounded-2xl p-4">
+                                <p className="text-gray-500 mb-1">工程納期</p>
+                                <p className="font-semibold text-gray-900">
+                                  {deadlineLabel || '未設定'}
+                                </p>
+                              </div>
+                            </div>
+
+                            {step.status === 'open' && (
+                              <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-2xl text-sm text-blue-700">
+                                この工程はまだ募集中です。工程単位の受注は次フェーズで有効化します。
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {request.status === 'cancelled' && (
               <div className="mb-10 p-6 bg-red-50 rounded-2xl border border-red-100">
@@ -644,7 +962,9 @@ export default function RequestDetail() {
                   <p className="text-sm text-gray-500">メッセージ</p>
                   <p className="text-xs text-gray-400 mt-1">
                     {request.status === 'open'
-                      ? '公開中の依頼では、ログイン済みユーザーが事前相談できます。'
+                      ? hasOrderSteps
+                        ? '工程付き依頼では、依頼者と担当クリエイターがここでやり取りできます。'
+                        : '公開中の依頼では、ログイン済みユーザーが事前相談できます。'
                       : '受発注後のやり取りは当事者のみ表示されます。'}
                   </p>
                 </div>
@@ -706,6 +1026,12 @@ export default function RequestDetail() {
             )}
 
             <div className="space-y-4 pt-6 border-t">
+              {hasOrderSteps && (
+                <div className="p-5 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-600 leading-7">
+                  工程付き依頼です。工程ごとの受注・納品・検収は次フェーズで有効化します。
+                </div>
+              )}
+
               {canAccept && (
                 <button
                   onClick={handleAccept}
