@@ -27,7 +27,35 @@ type OrderItem = {
   agreed_price: number | null
   status: string
   created_at: string
+  is_multi_step?: boolean | null
+  total_steps?: number | null
   categories?: CategoryValue
+}
+
+type OrderStepListingItem = {
+  id: string
+  order_id: string
+  step_number: number
+  title: string
+  description: string | null
+  required_category_id: number | null
+  budget: number | null
+  deadline: string | null
+  creator_id: string | null
+  status: string
+  created_at: string | null
+  updated_at: string | null
+  categories?: CategoryValue
+  orders?: {
+    id: string
+    title: string
+    description: string | null
+    client_id: string
+    status: string
+    is_multi_step: boolean | null
+    total_steps: number | null
+    categories?: CategoryValue
+  } | null
 }
 
 type CreatorItem = {
@@ -124,6 +152,7 @@ function ExchangePageContent() {
 
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null)
   const [orders, setOrders] = useState<OrderItem[]>([])
+  const [openOrderSteps, setOpenOrderSteps] = useState<OrderStepListingItem[]>([])
   const [creators, setCreators] = useState<CreatorItem[]>([])
   const [listings, setListings] = useState<ListingItem[]>([])
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([])
@@ -131,8 +160,10 @@ function ExchangePageContent() {
   const [creatorCategoryMap, setCreatorCategoryMap] = useState<CreatorCategoryMap>({})
   const [creatorSkillTagMap, setCreatorSkillTagMap] = useState<CreatorSkillTagMap>({})
   const [sellerMap, setSellerMap] = useState<SellerMap>({})
+
   const [activeTab, setActiveTab] = useState<'requests' | 'creators' | 'listings'>(initialTab)
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null)
+  const [acceptingStepId, setAcceptingStepId] = useState<string | null>(null)
   const [buyingListingId, setBuyingListingId] = useState<string | null>(null)
   const [creatingConsultationCreatorId, setCreatingConsultationCreatorId] = useState<string | null>(null)
 
@@ -196,291 +227,332 @@ function ExchangePageContent() {
   }, [])
 
   useEffect(() => {
-    const loadExchangePage = async () => {
-      setLoading(true)
-      setError(null)
+    loadExchangePage()
+  }, [])
 
-      try {
-        const supabase = createClient()
+  const loadExchangePage = async () => {
+    setLoading(true)
+    setError(null)
 
-        const {
-          data: { user: authUser },
-          error: authError,
-        } = await supabase.auth.getUser()
+    try {
+      const supabase = createClient()
 
-        if (authError) {
-          setError(authError.message)
-          setLoading(false)
-          return
-        }
+      const {
+        data: { user: authUser },
+        error: authError,
+      } = await supabase.auth.getUser()
 
-        if (!authUser) {
-          window.location.href = '/login'
-          return
-        }
+      if (authError) {
+        setError(authError.message)
+        setLoading(false)
+        return
+      }
 
-        const { data: profile, error: profileError } = await supabase
-          .from('users')
-          .select('id, auth_id, display_name, bio, twitter_handle, skills, portfolio_urls')
-          .eq('auth_id', authUser.id)
-          .single()
+      if (!authUser) {
+        window.location.href = '/login'
+        return
+      }
 
-        if (profileError || !profile) {
-          setError('ユーザー情報の取得に失敗しました')
-          setLoading(false)
-          return
-        }
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('id, auth_id, display_name, bio, twitter_handle, skills, portfolio_urls')
+        .eq('auth_id', authUser.id)
+        .single()
 
-        setCurrentUser(profile as UserProfile)
+      if (profileError || !profile) {
+        setError('ユーザー情報の取得に失敗しました')
+        setLoading(false)
+        return
+      }
 
-        const { data: categoryRows, error: categoriesError } = await supabase
-          .from('categories')
-          .select('id, name')
-          .order('name', { ascending: true })
+      setCurrentUser(profile as UserProfile)
 
-        if (categoriesError) {
-          setError(categoriesError.message || '品目一覧の取得に失敗しました')
-          setLoading(false)
-          return
-        }
+      const { data: categoryRows, error: categoriesError } = await supabase
+        .from('categories')
+        .select('id, name')
+        .order('name', { ascending: true })
 
-        setCategoryOptions((categoryRows || []) as CategoryOption[])
+      if (categoriesError) {
+        setError(categoriesError.message || '品目一覧の取得に失敗しました')
+        setLoading(false)
+        return
+      }
 
-        const { data: skillTagRows, error: skillTagError } = await supabase
-          .from('skill_tags')
-          .select('id, name, parent_category')
-          .order('name', { ascending: true })
+      setCategoryOptions((categoryRows || []) as CategoryOption[])
 
-        if (skillTagError) {
-          console.error('スキルサブカテゴリ一覧の取得に失敗しました', skillTagError)
-          setAllSkillTags([])
-        } else {
-          setAllSkillTags((skillTagRows || []) as SkillTag[])
-        }
+      const { data: skillTagRows, error: skillTagError } = await supabase
+        .from('skill_tags')
+        .select('id, name, parent_category')
+        .order('name', { ascending: true })
 
-        const { data: openOrders, error: ordersError } = await supabase
-          .from('orders')
-          .select(`
+      if (skillTagError) {
+        console.error('スキルサブカテゴリ一覧の取得に失敗しました', skillTagError)
+        setAllSkillTags([])
+      } else {
+        setAllSkillTags((skillTagRows || []) as SkillTag[])
+      }
+
+      const { data: openOrders, error: ordersError } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          client_id,
+          creator_id,
+          title,
+          description,
+          agreed_price,
+          status,
+          created_at,
+          is_multi_step,
+          total_steps,
+          categories(name)
+        `)
+        .eq('status', 'open')
+        .order('created_at', { ascending: false })
+
+      if (ordersError) {
+        setError(ordersError.message || '依頼一覧の取得に失敗しました')
+        setLoading(false)
+        return
+      }
+
+      setOrders((openOrders ?? []) as unknown as OrderItem[])
+
+      const { data: openStepRows, error: openStepsError } = await supabase
+        .from('order_steps')
+        .select(`
+          id,
+          order_id,
+          step_number,
+          title,
+          description,
+          required_category_id,
+          budget,
+          deadline,
+          creator_id,
+          status,
+          created_at,
+          updated_at,
+          categories(name),
+          orders!inner(
             id,
+            title,
+            description,
             client_id,
-            creator_id,
-            title,
-            description,
-            agreed_price,
             status,
-            created_at,
+            is_multi_step,
+            total_steps,
             categories(name)
-          `)
-          .eq('status', 'open')
-          .order('created_at', { ascending: false })
+          )
+        `)
+        .eq('status', 'open')
+        .eq('orders.status', 'open')
+        .is('creator_id', null)
+        .order('created_at', { ascending: false })
 
-        if (ordersError) {
-          setError(ordersError.message || '依頼一覧の取得に失敗しました')
-          setLoading(false)
-          return
-        }
+      if (openStepsError) {
+        console.error('募集中工程の取得に失敗しました', openStepsError)
+        setOpenOrderSteps([])
+      } else {
+        setOpenOrderSteps((openStepRows ?? []) as unknown as OrderStepListingItem[])
+      }
 
-        setOrders((openOrders ?? []) as unknown as OrderItem[])
+      const { data: creatorRows, error: creatorsError } = await supabase
+        .from('users')
+        .select('id, display_name, bio, twitter_handle, skills, portfolio_urls')
+        .order('created_at', { ascending: false })
 
-        const { data: creatorRows, error: creatorsError } = await supabase
-          .from('users')
-          .select('id, display_name, bio, twitter_handle, skills, portfolio_urls')
-          .order('created_at', { ascending: false })
+      if (creatorsError) {
+        setError(creatorsError.message || 'クリエイター一覧の取得に失敗しました')
+        setLoading(false)
+        return
+      }
 
-        if (creatorsError) {
-          setError(creatorsError.message || 'クリエイター一覧の取得に失敗しました')
-          setLoading(false)
-          return
-        }
+      const filteredCreatorRows = ((creatorRows ?? []) as CreatorItem[]).filter(
+        (creator) => creator.id !== profile.id
+      )
 
-        const filteredCreatorRows = ((creatorRows ?? []) as CreatorItem[]).filter(
-          (creator) => creator.id !== profile.id
-        )
+      setCreators(filteredCreatorRows)
 
-        setCreators(filteredCreatorRows)
+      const creatorIds = filteredCreatorRows.map((creator) => creator.id)
 
-        const creatorIds = filteredCreatorRows.map((creator) => creator.id)
-
-        if (creatorIds.length === 0) {
-          setCreatorCategoryMap({})
-          setCreatorSkillTagMap({})
-        } else {
-          const { data: categoryLinks, error: categoryLinksError } = await supabase
-            .from('user_categories')
-            .select(`
-              user_id,
-              category_id,
-              categories(name)
-            `)
-            .in('user_id', creatorIds)
-
-          if (categoryLinksError) {
-            console.error('クリエイター品目の取得に失敗しました', categoryLinksError)
-            setCreatorCategoryMap({})
-          } else {
-            const nextMap: CreatorCategoryMap = {}
-
-            ;(categoryLinks || []).forEach((row: any) => {
-              const userId = row.user_id
-              const categoryId = row.category_id
-
-              let categoryName: string | null = null
-
-              if (Array.isArray(row.categories)) {
-                categoryName = row.categories[0]?.name || null
-              } else {
-                categoryName = row.categories?.name || null
-              }
-
-              if (!nextMap[userId]) {
-                nextMap[userId] = { ids: [], names: [] }
-              }
-
-              if (!nextMap[userId].ids.includes(categoryId)) {
-                nextMap[userId].ids.push(categoryId)
-              }
-
-              if (categoryName && !nextMap[userId].names.includes(categoryName)) {
-                nextMap[userId].names.push(categoryName)
-              }
-            })
-
-            setCreatorCategoryMap(nextMap)
-          }
-
-          const { data: skillLinks, error: skillLinksError } = await supabase
-            .from('user_skill_tags')
-            .select(`
-              user_id,
-              skill_tag_id,
-              skill_tags (
-                id,
-                name,
-                parent_category
-              )
-            `)
-            .in('user_id', creatorIds)
-
-          if (skillLinksError) {
-            console.error('クリエイタースキルサブカテゴリの取得に失敗しました', skillLinksError)
-            setCreatorSkillTagMap({})
-          } else {
-            const nextSkillMap: CreatorSkillTagMap = {}
-
-            ;(skillLinks || []).forEach((row: any) => {
-              const userId = row.user_id
-
-              const tag = Array.isArray(row.skill_tags)
-                ? row.skill_tags[0]
-                : row.skill_tags
-
-              if (!tag) return
-
-              const tagId = tag.id || row.skill_tag_id
-              const tagName = tag.name || ''
-              const parentCategory = tag.parent_category || 'その他'
-
-              if (!tagName) return
-
-              if (!nextSkillMap[userId]) {
-                nextSkillMap[userId] = {
-                  ids: [],
-                  names: [],
-                  parentCategories: [],
-                  tags: [],
-                }
-              }
-
-              if (!nextSkillMap[userId].ids.includes(tagId)) {
-                nextSkillMap[userId].ids.push(tagId)
-              }
-
-              if (!nextSkillMap[userId].names.includes(tagName)) {
-                nextSkillMap[userId].names.push(tagName)
-              }
-
-              if (!nextSkillMap[userId].parentCategories.includes(parentCategory)) {
-                nextSkillMap[userId].parentCategories.push(parentCategory)
-              }
-
-              const alreadyExists = nextSkillMap[userId].tags.some(
-                (existingTag) => existingTag.id === tagId
-              )
-
-              if (!alreadyExists) {
-                nextSkillMap[userId].tags.push({
-                  id: tagId,
-                  name: tagName,
-                  parent_category: parentCategory,
-                })
-              }
-            })
-
-            setCreatorSkillTagMap(nextSkillMap)
-          }
-        }
-
-        const { data: listingRows, error: listingsError } = await supabase
-          .from('product_listings')
+      if (creatorIds.length === 0) {
+        setCreatorCategoryMap({})
+        setCreatorSkillTagMap({})
+      } else {
+        const { data: categoryLinks, error: categoryLinksError } = await supabase
+          .from('user_categories')
           .select(`
-            id,
-            seller_user_id,
-            title,
-            description,
-            price,
-            image_urls,
-            status,
-            created_at,
+            user_id,
+            category_id,
             categories(name)
           `)
-          .eq('status', 'active')
-          .order('created_at', { ascending: false })
+          .in('user_id', creatorIds)
 
-        if (listingsError) {
-          setError(listingsError.message || '作品一覧の取得に失敗しました')
-          setLoading(false)
-          return
-        }
+        if (categoryLinksError) {
+          console.error('クリエイター品目の取得に失敗しました', categoryLinksError)
+          setCreatorCategoryMap({})
+        } else {
+          const nextMap: CreatorCategoryMap = {}
 
-        const activeListings = (listingRows ?? []) as unknown as ListingItem[]
-        setListings(activeListings)
+          ;(categoryLinks || []).forEach((row: any) => {
+            const userId = row.user_id
+            const categoryId = row.category_id
 
-        const sellerIds = [
-          ...new Set(activeListings.map((listing) => listing.seller_user_id).filter(Boolean)),
-        ]
+            let categoryName: string | null = null
 
-        if (sellerIds.length > 0) {
-          const { data: sellerRows, error: sellersError } = await supabase
-            .from('users')
-            .select('id, display_name, twitter_handle')
-            .in('id', sellerIds)
+            if (Array.isArray(row.categories)) {
+              categoryName = row.categories[0]?.name || null
+            } else {
+              categoryName = row.categories?.name || null
+            }
 
-          if (sellersError) {
-            setError(sellersError.message || '出品者情報の取得に失敗しました')
-            setLoading(false)
-            return
-          }
+            if (!nextMap[userId]) {
+              nextMap[userId] = { ids: [], names: [] }
+            }
 
-          const nextSellerMap: SellerMap = {}
+            if (!nextMap[userId].ids.includes(categoryId)) {
+              nextMap[userId].ids.push(categoryId)
+            }
 
-          ;(sellerRows || []).forEach((seller: any) => {
-            nextSellerMap[seller.id] = {
-              display_name: seller.display_name || null,
-              twitter_handle: seller.twitter_handle || null,
+            if (categoryName && !nextMap[userId].names.includes(categoryName)) {
+              nextMap[userId].names.push(categoryName)
             }
           })
 
-          setSellerMap(nextSellerMap)
+          setCreatorCategoryMap(nextMap)
         }
-      } catch (err: any) {
-        setError(err?.message || '読み込み中にエラーが発生しました')
-      } finally {
-        setLoading(false)
-      }
-    }
 
-    loadExchangePage()
-  }, [])
+        const { data: skillLinks, error: skillLinksError } = await supabase
+          .from('user_skill_tags')
+          .select(`
+            user_id,
+            skill_tag_id,
+            skill_tags (
+              id,
+              name,
+              parent_category
+            )
+          `)
+          .in('user_id', creatorIds)
+
+        if (skillLinksError) {
+          console.error('クリエイタースキルサブカテゴリの取得に失敗しました', skillLinksError)
+          setCreatorSkillTagMap({})
+        } else {
+          const nextSkillMap: CreatorSkillTagMap = {}
+
+          ;(skillLinks || []).forEach((row: any) => {
+            const userId = row.user_id
+
+            const tag = Array.isArray(row.skill_tags)
+              ? row.skill_tags[0]
+              : row.skill_tags
+
+            if (!tag) return
+
+            const tagId = tag.id || row.skill_tag_id
+            const tagName = tag.name || ''
+            const parentCategory = tag.parent_category || 'その他'
+
+            if (!tagName) return
+
+            if (!nextSkillMap[userId]) {
+              nextSkillMap[userId] = {
+                ids: [],
+                names: [],
+                parentCategories: [],
+                tags: [],
+              }
+            }
+
+            if (!nextSkillMap[userId].ids.includes(tagId)) {
+              nextSkillMap[userId].ids.push(tagId)
+            }
+
+            if (!nextSkillMap[userId].names.includes(tagName)) {
+              nextSkillMap[userId].names.push(tagName)
+            }
+
+            if (!nextSkillMap[userId].parentCategories.includes(parentCategory)) {
+              nextSkillMap[userId].parentCategories.push(parentCategory)
+            }
+
+            const alreadyExists = nextSkillMap[userId].tags.some(
+              (existingTag) => existingTag.id === tagId
+            )
+
+            if (!alreadyExists) {
+              nextSkillMap[userId].tags.push({
+                id: tagId,
+                name: tagName,
+                parent_category: parentCategory,
+              })
+            }
+          })
+
+          setCreatorSkillTagMap(nextSkillMap)
+        }
+      }
+
+      const { data: listingRows, error: listingsError } = await supabase
+        .from('product_listings')
+        .select(`
+          id,
+          seller_user_id,
+          title,
+          description,
+          price,
+          image_urls,
+          status,
+          created_at,
+          categories(name)
+        `)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+
+      if (listingsError) {
+        setError(listingsError.message || '作品一覧の取得に失敗しました')
+        setLoading(false)
+        return
+      }
+
+      const activeListings = (listingRows ?? []) as unknown as ListingItem[]
+      setListings(activeListings)
+
+      const sellerIds = [
+        ...new Set(activeListings.map((listing) => listing.seller_user_id).filter(Boolean)),
+      ]
+
+      if (sellerIds.length > 0) {
+        const { data: sellerRows, error: sellersError } = await supabase
+          .from('users')
+          .select('id, display_name, twitter_handle')
+          .in('id', sellerIds)
+
+        if (sellersError) {
+          setError(sellersError.message || '出品者情報の取得に失敗しました')
+          setLoading(false)
+          return
+        }
+
+        const nextSellerMap: SellerMap = {}
+
+        ;(sellerRows || []).forEach((seller: any) => {
+          nextSellerMap[seller.id] = {
+            display_name: seller.display_name || null,
+            twitter_handle: seller.twitter_handle || null,
+          }
+        })
+
+        setSellerMap(nextSellerMap)
+      }
+    } catch (err: any) {
+      setError(err?.message || '読み込み中にエラーが発生しました')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const getCategoryName = (target: { categories?: CategoryValue }) => {
     if (!target.categories) return '未分類'
@@ -574,6 +646,15 @@ function ExchangePageContent() {
     return sorted[middle]
   }
 
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return '未設定'
+
+    const date = new Date(dateString)
+    if (Number.isNaN(date.getTime())) return dateString
+
+    return date.toLocaleDateString('ja-JP')
+  }
+
   const loadListingMarketStats = async (categoryId: string) => {
     if (!categoryId) {
       setListingMarketStats(null)
@@ -650,15 +731,22 @@ function ExchangePageContent() {
       .slice(0, 20)
   }, [allSkillTags, creatorParentCategory, creatorSkillTagKeyword])
 
-  const filteredOrders = useMemo(() => {
+  const orderIdsWithOpenSteps = useMemo(() => {
+    return new Set(openOrderSteps.map((step) => step.order_id))
+  }, [openOrderSteps])
+
+  const filteredOpenOrderSteps = useMemo(() => {
     const parsedMinBudget = minBudget.trim() === '' ? null : Number(minBudget)
     const parsedMaxBudget = maxBudget.trim() === '' ? null : Number(maxBudget)
 
-    return orders.filter((order) => {
-      const categoryName = getCategoryName(order)
-      const title = order.title || ''
-      const description = order.description || ''
-      const price = order.agreed_price
+    return openOrderSteps.filter((step) => {
+      const categoryName = getCategoryName(step)
+      const parentOrder = step.orders
+      const orderTitle = parentOrder?.title || ''
+      const orderDescription = parentOrder?.description || ''
+      const stepTitle = step.title || ''
+      const stepDescription = step.description || ''
+      const budget = step.budget
 
       const matchCategory =
         requestCategoryId === '' ||
@@ -666,25 +754,27 @@ function ExchangePageContent() {
 
       const matchTitle =
         titleKeyword.trim() === '' ||
-        title.toLowerCase().includes(titleKeyword.toLowerCase())
+        orderTitle.toLowerCase().includes(titleKeyword.toLowerCase()) ||
+        stepTitle.toLowerCase().includes(titleKeyword.toLowerCase())
 
       const matchDescription =
         descriptionKeyword.trim() === '' ||
-        description.toLowerCase().includes(descriptionKeyword.toLowerCase())
+        orderDescription.toLowerCase().includes(descriptionKeyword.toLowerCase()) ||
+        stepDescription.toLowerCase().includes(descriptionKeyword.toLowerCase())
 
       const matchMinBudget =
         parsedMinBudget === null ||
         (typeof parsedMinBudget === 'number' &&
           !Number.isNaN(parsedMinBudget) &&
-          price !== null &&
-          Number(price) >= parsedMinBudget)
+          budget !== null &&
+          Number(budget) >= parsedMinBudget)
 
       const matchMaxBudget =
         parsedMaxBudget === null ||
         (typeof parsedMaxBudget === 'number' &&
           !Number.isNaN(parsedMaxBudget) &&
-          price !== null &&
-          Number(price) <= parsedMaxBudget)
+          budget !== null &&
+          Number(budget) <= parsedMaxBudget)
 
       return (
         matchCategory &&
@@ -695,7 +785,7 @@ function ExchangePageContent() {
       )
     })
   }, [
-    orders,
+    openOrderSteps,
     requestCategoryId,
     titleKeyword,
     descriptionKeyword,
@@ -703,6 +793,65 @@ function ExchangePageContent() {
     maxBudget,
     categoryOptions,
   ])
+
+  const filteredOrders = useMemo(() => {
+    const parsedMinBudget = minBudget.trim() === '' ? null : Number(minBudget)
+    const parsedMaxBudget = maxBudget.trim() === '' ? null : Number(maxBudget)
+
+    return orders
+      .filter((order) => !orderIdsWithOpenSteps.has(order.id))
+      .filter((order) => {
+        const categoryName = getCategoryName(order)
+        const title = order.title || ''
+        const description = order.description || ''
+        const price = order.agreed_price
+
+        const matchCategory =
+          requestCategoryId === '' ||
+          categoryOptions.find((cat) => cat.id === Number(requestCategoryId))?.name === categoryName
+
+        const matchTitle =
+          titleKeyword.trim() === '' ||
+          title.toLowerCase().includes(titleKeyword.toLowerCase())
+
+        const matchDescription =
+          descriptionKeyword.trim() === '' ||
+          description.toLowerCase().includes(descriptionKeyword.toLowerCase())
+
+        const matchMinBudget =
+          parsedMinBudget === null ||
+          (typeof parsedMinBudget === 'number' &&
+            !Number.isNaN(parsedMinBudget) &&
+            price !== null &&
+            Number(price) >= parsedMinBudget)
+
+        const matchMaxBudget =
+          parsedMaxBudget === null ||
+          (typeof parsedMaxBudget === 'number' &&
+            !Number.isNaN(parsedMaxBudget) &&
+            price !== null &&
+            Number(price) <= parsedMaxBudget)
+
+        return (
+          matchCategory &&
+          matchTitle &&
+          matchDescription &&
+          matchMinBudget &&
+          matchMaxBudget
+        )
+      })
+  }, [
+    orders,
+    orderIdsWithOpenSteps,
+    requestCategoryId,
+    titleKeyword,
+    descriptionKeyword,
+    minBudget,
+    maxBudget,
+    categoryOptions,
+  ])
+
+  const totalRequestListings = filteredOpenOrderSteps.length + filteredOrders.length
 
   const filteredCreators = useMemo(() => {
     return creators.filter((creator) => {
@@ -868,6 +1017,80 @@ function ExchangePageContent() {
     }
   }
 
+  const handleAcceptStep = async (stepId: string) => {
+    if (!currentUser?.id) {
+      window.location.href = '/login'
+      return
+    }
+
+    const targetStep = openOrderSteps.find((step) => step.id === stepId)
+    if (!targetStep) {
+      alert('対象の工程が見つかりませんでした')
+      return
+    }
+
+    const parentOrder = targetStep.orders
+
+    if (!parentOrder) {
+      alert('親依頼の情報が見つかりませんでした')
+      return
+    }
+
+    if (String(parentOrder.client_id) === String(currentUser.id)) {
+      alert('自分自身の依頼工程は受注できません')
+      return
+    }
+
+    if (targetStep.status !== 'open' || targetStep.creator_id) {
+      alert('この工程はすでに受注済み、または公開終了です')
+      return
+    }
+
+    const confirmed = window.confirm(
+      `「${parentOrder.title}」の工程「${targetStep.title}」を受注しますか？`
+    )
+
+    if (!confirmed) return
+
+    setAcceptingStepId(stepId)
+
+    try {
+      const supabase = createClient()
+
+      const { error: updateError } = await supabase
+        .from('order_steps')
+        .update({
+          creator_id: currentUser.id,
+          status: 'matched',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', stepId)
+        .eq('status', 'open')
+        .is('creator_id', null)
+
+      if (updateError) {
+        alert('工程の受注に失敗しました: ' + updateError.message)
+        return
+      }
+
+      await supabase.from('notifications').insert({
+        user_id: parentOrder.client_id,
+        type: 'order_step_matched',
+        title: '工程が受注されました',
+        body: `「${parentOrder.title}」の工程「${targetStep.title}」が受注されました。`,
+        link_url: `/request/${targetStep.order_id}`,
+      })
+
+      alert('工程を受注しました')
+      router.push(`/request/${targetStep.order_id}`)
+      router.refresh()
+    } catch (err: any) {
+      alert(err?.message || '工程受注処理中にエラーが発生しました')
+    } finally {
+      setAcceptingStepId(null)
+    }
+  }
+
   const handleCreateConsultation = async (creator: CreatorItem) => {
     if (!currentUser?.id) {
       window.location.href = '/login'
@@ -1030,7 +1253,7 @@ function ExchangePageContent() {
             </div>
             <h1 className="text-4xl md:text-5xl font-bold tracking-tight">案件を探す</h1>
             <p className="mt-3 text-gray-600 text-lg">
-              公開依頼・クリエイター・既製品を横断して探せます
+              公開依頼・募集中工程・クリエイター・既製品を横断して探せます
             </p>
           </div>
 
@@ -1084,15 +1307,15 @@ function ExchangePageContent() {
             <div className="bg-white rounded-3xl shadow-xl p-8 mb-8">
               <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold">依頼を検索</h2>
+                  <h2 className="text-2xl font-bold">依頼・工程を検索</h2>
                   <p className="text-sm text-gray-500 mt-2">
-                    カテゴリ・タイトル・説明文・予算から公開依頼を絞り込めます
+                    募集中工程・公開依頼をカテゴリ・タイトル・説明文・予算から絞り込めます
                   </p>
                 </div>
 
                 <div className="flex items-center gap-4">
                   <span className="text-sm text-gray-500">
-                    公開中 {filteredOrders.length} 件
+                    表示中 {totalRequestListings} 件
                   </span>
                   <Link
                     href="/request/new"
@@ -1178,16 +1401,115 @@ function ExchangePageContent() {
               </div>
             </div>
 
-            {filteredOrders.length === 0 ? (
+            {totalRequestListings === 0 ? (
               <div className="bg-white rounded-3xl shadow-xl p-14 text-center">
                 <div className="text-5xl mb-4">🔎</div>
-                <h3 className="text-xl font-bold mb-2">公開依頼が見つかりません</h3>
+                <h3 className="text-xl font-bold mb-2">募集中の工程・公開依頼が見つかりません</h3>
                 <p className="text-gray-500">
                   検索条件をゆるめると、表示される場合があります
                 </p>
               </div>
             ) : (
               <div className="grid gap-6">
+                {filteredOpenOrderSteps.map((step) => {
+                  const parentOrder = step.orders
+                  const isOwnOrder =
+                    currentUser?.id && parentOrder?.client_id === currentUser.id
+                  const categoryName = getCategoryName(step)
+
+                  return (
+                    <div
+                      key={step.id}
+                      className="bg-white rounded-3xl shadow-xl p-8 border border-blue-100 hover:shadow-2xl transition-shadow"
+                    >
+                      <div className="flex flex-col xl:flex-row xl:items-stretch gap-8">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-3 mb-5">
+                            <span className="inline-flex px-4 py-1.5 rounded-full bg-blue-600 text-white text-sm font-medium">
+                              工程募集
+                            </span>
+
+                            <span className="inline-flex px-4 py-1.5 rounded-full bg-blue-50 text-blue-700 text-sm font-medium border border-blue-100">
+                              {categoryName}
+                            </span>
+
+                            {parentOrder?.is_multi_step && (
+                              <span className="inline-flex px-4 py-1.5 rounded-full bg-purple-50 text-purple-700 text-sm font-medium border border-purple-100">
+                                全{parentOrder.total_steps || '?'}工程中 {step.step_number}工程目
+                              </span>
+                            )}
+                          </div>
+
+                          <Link href={`/request/${step.order_id}`} className="block">
+                            <p className="text-sm text-gray-500 mb-2">
+                              親依頼：{parentOrder?.title || '依頼名未設定'}
+                            </p>
+                            <h3 className="text-3xl font-bold mb-3 hover:text-blue-600 transition">
+                              工程{step.step_number}：{step.title}
+                            </h3>
+                          </Link>
+
+                          <p className="text-gray-700 leading-8 text-base whitespace-pre-wrap">
+                            {getOrderDescription(step.description || parentOrder?.description || null)}
+                          </p>
+
+                          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="bg-gray-50 rounded-2xl p-4">
+                              <p className="text-xs text-gray-500 mb-1">工程納期</p>
+                              <p className="font-bold text-gray-900">
+                                {formatDate(step.deadline)}
+                              </p>
+                            </div>
+
+                            <div className="bg-gray-50 rounded-2xl p-4">
+                              <p className="text-xs text-gray-500 mb-1">親依頼ステータス</p>
+                              <p className="font-bold text-gray-900">
+                                {parentOrder?.status === 'open' ? '公開中' : parentOrder?.status || '不明'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="w-full xl:w-80 shrink-0 flex flex-col">
+                          <div className="bg-blue-50 rounded-3xl p-6 mb-4 border border-blue-100">
+                            <p className="text-sm text-blue-600 mb-2">工程予算</p>
+                            <p className="text-4xl font-bold text-blue-600 tracking-tight">
+                              {step.budget !== null && Number(step.budget) > 0
+                                ? `¥${Number(step.budget).toLocaleString()}`
+                                : '未設定'}
+                            </p>
+                          </div>
+
+                          <div className="space-y-3 mt-auto">
+                            <button
+                              onClick={() => handleAcceptStep(step.id)}
+                              disabled={!!isOwnOrder || acceptingStepId === step.id}
+                              className={`w-full py-4 rounded-2xl font-medium text-white shadow-sm transition ${
+                                isOwnOrder || acceptingStepId === step.id
+                                  ? 'bg-gray-400 cursor-not-allowed'
+                                  : 'bg-blue-600 hover:bg-blue-700'
+                              }`}
+                            >
+                              {isOwnOrder
+                                ? '自分の依頼工程です'
+                                : acceptingStepId === step.id
+                                  ? '受注中...'
+                                  : 'この工程を受注する'}
+                            </button>
+
+                            <Link
+                              href={`/request/${step.order_id}`}
+                              className="block w-full text-center border border-gray-200 hover:bg-gray-50 py-4 rounded-2xl font-medium transition"
+                            >
+                              依頼全体を見る
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+
                 {filteredOrders.map((order) => {
                   const isOwnOrder = currentUser?.id === order.client_id
                   const canAccept =
@@ -1204,6 +1526,10 @@ function ExchangePageContent() {
                       <div className="flex flex-col xl:flex-row xl:items-stretch gap-8">
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-3 mb-5">
+                            <span className="inline-flex px-4 py-1.5 rounded-full bg-gray-100 text-gray-700 text-sm font-medium border border-gray-200">
+                              通常依頼
+                            </span>
+
                             <span className="inline-flex px-4 py-1.5 rounded-full bg-blue-50 text-blue-700 text-sm font-medium border border-blue-100">
                               {getCategoryName(order)}
                             </span>
