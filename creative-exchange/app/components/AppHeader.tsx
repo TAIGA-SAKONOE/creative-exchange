@@ -82,7 +82,7 @@ export default function AppHeader() {
                         onClick={closeDropdowns}
                         className="block px-4 py-3 rounded-xl hover:bg-gray-100 transition"
                       >
-                        人を探す
+                        クリエイターを探す
                       </Link>
 
                       <Link
