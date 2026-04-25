@@ -116,6 +116,14 @@ function NewRequestContent() {
   const isNamedRequest = requestType === 'named'
   const isMultiStep = steps.length >= 2
 
+  const today = useMemo(() => {
+    const now = new Date()
+    const yyyy = now.getFullYear()
+    const mm = String(now.getMonth() + 1).padStart(2, '0')
+    const dd = String(now.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
+  }, [])
+
   const groupedCategories = useMemo(() => {
     return groupCategoriesByParent(categories)
   }, [categories])
@@ -138,14 +146,6 @@ function NewRequestContent() {
     return deadlines[deadlines.length - 1]
   }, [steps])
 
-const today = useMemo(() => {
-  const now = new Date()
-  const yyyy = now.getFullYear()
-  const mm = String(now.getMonth() + 1).padStart(2, '0')
-  const dd = String(now.getDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
-}, [])
-  
   useEffect(() => {
     const initializePage = async () => {
       const supabase = createClient()
@@ -366,60 +366,55 @@ const today = useMemo(() => {
       return false
     }
 
-if (step.deadline && step.deadline < today) {
-  alert(`${label}の納期には今日以降の日付を選択してください`)
-  return false
-}
-    
     if (steps.length > 10) {
       alert('工程は最大10個までです')
       return false
     }
 
-   for (let i = 0; i < steps.length; i++) {
-  const step = steps[i]
-  const label = `工程${i + 1}`
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i]
+      const label = `工程${i + 1}`
 
-  if (!step.title.trim()) {
-    alert(`${label}の工程タイトルを入力してください`)
-    return false
-  }
+      if (!step.title.trim()) {
+        alert(`${label}の工程タイトルを入力してください`)
+        return false
+      }
 
-  if (!step.category_id) {
-    alert(`${label}の必要カテゴリを選択してください`)
-    return false
-  }
+      if (!step.category_id) {
+        alert(`${label}の必要カテゴリを選択してください`)
+        return false
+      }
 
-  if (step.budget.trim() !== '') {
-    const budgetValue = Number(step.budget)
-    if (!Number.isFinite(budgetValue) || budgetValue < 0) {
-      alert(`${label}の予算は0以上の数値で入力してください`)
-      return false
+      if (step.budget.trim() !== '') {
+        const budgetValue = Number(step.budget)
+        if (!Number.isFinite(budgetValue) || budgetValue < 0) {
+          alert(`${label}の予算は0以上の数値で入力してください`)
+          return false
+        }
+      }
+
+      if (step.deadline && step.deadline < today) {
+        alert(`${label}の納期には今日以降の日付を選択してください`)
+        return false
+      }
+
+      if (step.parallel_group.trim() !== '') {
+        const groupValue = Number(step.parallel_group)
+        if (
+          !Number.isInteger(groupValue) ||
+          groupValue < 1 ||
+          groupValue > 5
+        ) {
+          alert(`${label}の並行グループは1〜5の範囲で選択してください`)
+          return false
+        }
+      }
+
+      if (isNamedRequest && !step.named_creator?.id) {
+        alert(`${label}の指名クリエイターを選択してください`)
+        return false
+      }
     }
-  }
-
-  if (step.deadline && step.deadline < today) {
-    alert(`${label}の納期には今日以降の日付を選択してください`)
-    return false
-  }
-
-  if (step.parallel_group.trim() !== '') {
-    const groupValue = Number(step.parallel_group)
-    if (
-      !Number.isInteger(groupValue) ||
-      groupValue < 1 ||
-      groupValue > 5
-    ) {
-      alert(`${label}の並行グループは1〜5の範囲で選択してください`)
-      return false
-    }
-  }
-
-  if (isNamedRequest && !step.named_creator?.id) {
-    alert(`${label}の指名クリエイターを選択してください`)
-    return false
-  }
-}
 
     return true
   }
@@ -528,21 +523,12 @@ if (step.deadline && step.deadline < today) {
         .from('orders')
         .insert({
           client_id: profile.id,
-
-          // 親ordersのcreator_idは互換用。
-          // 実際の担当者管理は order_steps.creator_id で行う。
           creator_id: firstNamedCreatorId,
-
           category_id: firstStep.required_category_id,
           title: title.trim(),
           description: description.trim(),
-
-          // 既存UIとの互換用。工程予算の合計を親にも保持する。
           agreed_price: totalBudget,
-
-          // 既存UIとの互換用。工程納期のうち最も遅いものを親にも保持する。
           deadline: latestDeadline,
-
           specification: {
             note: isNamedRequest ? '指名依頼' : '公開依頼',
             request_type: requestType,
@@ -550,10 +536,7 @@ if (step.deadline && step.deadline < today) {
             phase: 'G-2',
             workflow: 'order_steps',
           },
-
-          // Phase D方針：orders.statusは公開中 / 完了 / キャンセルのみ。
           status: 'open',
-
           is_named: isNamedRequest,
           is_multi_step: normalizedSteps.length >= 2,
           total_steps: normalizedSteps.length,
@@ -860,14 +843,14 @@ if (step.deadline && step.deadline < today) {
                           工程納期
                         </label>
                         <input
-  type="date"
-  value={step.deadline}
-  min={today}
-  onChange={(e) =>
-    updateStep(index, 'deadline', e.target.value)
-  }
-  className="w-full p-4 border border-gray-300 rounded-2xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
-/>
+                          type="date"
+                          value={step.deadline}
+                          min={today}
+                          onChange={(e) =>
+                            updateStep(index, 'deadline', e.target.value)
+                          }
+                          className="w-full p-4 border border-gray-300 rounded-2xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        />
                       </div>
 
                       <div>
