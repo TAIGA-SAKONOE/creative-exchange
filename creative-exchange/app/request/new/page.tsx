@@ -23,6 +23,13 @@ type DirectedCreator = {
 type CategoryOption = {
   id: number
   name: string
+  parent_category: string | null
+  sort_order: number | null
+}
+
+type CategoryGroup = {
+  parentCategory: string
+  items: CategoryOption[]
 }
 
 type RequestStepInput = {
@@ -61,6 +68,25 @@ const isPastDate = (dateString: string) => {
   return targetStart.getTime() < todayStart.getTime()
 }
 
+const groupCategoriesByParent = (categories: CategoryOption[]): CategoryGroup[] => {
+  const grouped = new Map<string, CategoryOption[]>()
+
+  categories.forEach((category) => {
+    const parent = category.parent_category || 'その他'
+
+    if (!grouped.has(parent)) {
+      grouped.set(parent, [])
+    }
+
+    grouped.get(parent)!.push(category)
+  })
+
+  return Array.from(grouped.entries()).map(([parentCategory, items]) => ({
+    parentCategory,
+    items: items.sort((a, b) => a.name.localeCompare(b.name, 'ja')),
+  }))
+}
+
 export default function NewRequest() {
   return (
     <Suspense fallback={<div className="p-12 text-center">読み込み中...</div>}>
@@ -90,6 +116,10 @@ function NewRequestContent() {
 
   const todayDateString = getTodayDateString()
   const isMultiStep = steps.length >= 2
+
+  const categoryGroupedOptions = useMemo(() => {
+    return groupCategoriesByParent(categories)
+  }, [categories])
 
   const totalBudget = useMemo(() => {
     return steps.reduce((sum, step) => {
@@ -124,8 +154,10 @@ function NewRequestContent() {
 
       const { data: categoryRows, error: categoryError } = await supabase
         .from('categories')
-        .select('id, name')
-        .order('name')
+        .select('id, name, parent_category, sort_order')
+        .order('sort_order', { ascending: true })
+        .order('parent_category', { ascending: true })
+        .order('name', { ascending: true })
 
       if (categoryError) {
         console.error('カテゴリ取得エラー:', categoryError)
@@ -592,10 +624,18 @@ function NewRequestContent() {
                           required
                         >
                           <option value="">品目を選択してください</option>
-                          {categories.map((cat) => (
-                            <option key={cat.id} value={cat.id}>
-                              {cat.name}
-                            </option>
+
+                          {categoryGroupedOptions.map((group) => (
+                            <optgroup
+                              key={group.parentCategory}
+                              label={group.parentCategory}
+                            >
+                              {group.items.map((cat) => (
+                                <option key={cat.id} value={cat.id}>
+                                  {cat.name}
+                                </option>
+                              ))}
+                            </optgroup>
                           ))}
                         </select>
                       </div>
