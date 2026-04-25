@@ -760,7 +760,7 @@ export default function CreatorProfile() {
                 </button>
 
                 <Link
-                  href={`/request/new?creator_id=${creatorId}`}
+                  href={`/request/new?creator_id=${creatorId}&type=named`}
                   className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold transition"
                 >
                   このクリエイターに依頼する
