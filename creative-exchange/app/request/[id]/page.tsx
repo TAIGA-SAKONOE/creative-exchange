@@ -30,6 +30,20 @@ export default function RequestDetail() {
     loadData()
   }, [id])
 
+  const getDeliverablePath = (fileUrl: string | null) => {
+    if (!fileUrl) return null
+
+    if (fileUrl.includes('/storage/v1/object/public/deliverables/')) {
+      return fileUrl.split('/storage/v1/object/public/deliverables/')[1] || null
+    }
+
+    if (fileUrl.includes('/storage/v1/object/sign/deliverables/')) {
+      return fileUrl.split('/storage/v1/object/sign/deliverables/')[1]?.split('?')[0] || null
+    }
+
+    return fileUrl
+  }
+
   const createNotification = async ({
     userId,
     type,
@@ -110,7 +124,38 @@ export default function RequestDetail() {
       if (filesError) {
         console.error('deliverables取得エラー', filesError)
       } else {
-        setDeliverables(files ?? [])
+        const filesWithSignedUrls = await Promise.all(
+          (files ?? []).map(async (file: any) => {
+            const filePath = getDeliverablePath(file.file_url)
+
+            if (!filePath) {
+              return {
+                ...file,
+                signed_url: null,
+              }
+            }
+
+            const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+              .from('deliverables')
+              .createSignedUrl(filePath, 60 * 60)
+
+            if (signedUrlError) {
+              console.error('納品ファイル署名URL作成エラー', signedUrlError)
+
+              return {
+                ...file,
+                signed_url: null,
+              }
+            }
+
+            return {
+              ...file,
+              signed_url: signedUrlData.signedUrl,
+            }
+          })
+        )
+
+        setDeliverables(filesWithSignedUrls)
       }
 
       const { data: messageRows, error: messagesError } = await supabase
@@ -176,15 +221,11 @@ export default function RequestDetail() {
 
       if (uploadError) throw uploadError
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('deliverables').getPublicUrl(filePath)
-
       const { error: insertError } = await supabase
         .from('deliverables')
         .insert({
           order_id: id,
-          file_url: publicUrl,
+          file_url: filePath,
           file_type: selectedFile.type || null,
           version: 1,
           note: selectedFile.name,
@@ -369,7 +410,9 @@ export default function RequestDetail() {
     const diffMs = deadlineStart.getTime() - todayStart.getTime()
     const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
 
-    const formattedDate = `${deadlineStart.getFullYear()}年${deadlineStart.getMonth() + 1}月${deadlineStart.getDate()}日`
+    const formattedDate = `${deadlineStart.getFullYear()}年${
+      deadlineStart.getMonth() + 1
+    }月${deadlineStart.getDate()}日`
 
     if (diffDays > 0) {
       return {
@@ -517,26 +560,29 @@ export default function RequestDetail() {
               </div>
             )}
 
-            {request.deadline && (() => {
-              const deadlineMeta = getDeadlineMeta(request.deadline)
+            {request.deadline &&
+              (() => {
+                const deadlineMeta = getDeadlineMeta(request.deadline)
 
-              return (
-                <div className={`mb-10 p-6 rounded-2xl ${deadlineMeta.containerClass}`}>
-                  <p className={`text-sm mb-1 ${deadlineMeta.labelClass}`}>希望納期</p>
-                  <p className={`text-2xl font-bold ${deadlineMeta.dateClass}`}>
-                    {deadlineMeta.formattedDate}
-                  </p>
-                  <p className={`mt-2 text-sm font-medium ${deadlineMeta.labelClass}`}>
-                    {deadlineMeta.relativeLabel}
-                  </p>
-                </div>
-              )
-            })()}
+                return (
+                  <div className={`mb-10 p-6 rounded-2xl ${deadlineMeta.containerClass}`}>
+                    <p className={`text-sm mb-1 ${deadlineMeta.labelClass}`}>希望納期</p>
+                    <p className={`text-2xl font-bold ${deadlineMeta.dateClass}`}>
+                      {deadlineMeta.formattedDate}
+                    </p>
+                    <p className={`mt-2 text-sm font-medium ${deadlineMeta.labelClass}`}>
+                      {deadlineMeta.relativeLabel}
+                    </p>
+                  </div>
+                )
+              })()}
 
             {request.status === 'cancelled' && (
               <div className="mb-10 p-6 bg-red-50 rounded-2xl border border-red-100">
                 <p className="text-sm text-red-700 mb-2">キャンセル情報</p>
-                <p className="text-lg font-semibold text-red-600 mb-2">この依頼はキャンセルされました</p>
+                <p className="text-lg font-semibold text-red-600 mb-2">
+                  この依頼はキャンセルされました
+                </p>
                 <p className="text-sm text-red-700 whitespace-pre-wrap">
                   理由: {request.cancel_reason || '理由未入力'}
                 </p>
@@ -556,10 +602,16 @@ export default function RequestDetail() {
                   {deliverables.map((file: any) => (
                     <a
                       key={file.id}
-                      href={file.file_url || '#'}
+                      href={file.signed_url || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-4 p-5 bg-gray-50 hover:bg-gray-100 rounded-2xl transition group"
+                      onClick={(e) => {
+                        if (!file.signed_url) {
+                          e.preventDefault()
+                          alert('納品ファイルの表示URLを作成できませんでした')
+                        }
+                      }}
                     >
                       <div className="text-3xl">📎</div>
                       <div className="flex-1 min-w-0">
