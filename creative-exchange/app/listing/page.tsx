@@ -6,23 +6,57 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import ProductMarketStatsCard from '../components/ProductMarketStatsCard'
 
+type Category = {
+  id: number
+  name: string
+  parent_category: string | null
+  sort_order: number | null
+}
+
+type CategoryGroup = {
+  parentCategory: string
+  items: Category[]
+}
+
+type ProductMarketStats = {
+  count: number
+  average: number
+  median: number
+  min: number
+  max: number
+} | null
+
+const groupCategoriesByParent = (categories: Category[]): CategoryGroup[] => {
+  const grouped = new Map<string, Category[]>()
+
+  categories.forEach((category) => {
+    const parent = category.parent_category || 'その他'
+
+    if (!grouped.has(parent)) {
+      grouped.set(parent, [])
+    }
+
+    grouped.get(parent)!.push(category)
+  })
+
+  return Array.from(grouped.entries()).map(([parentCategory, items]) => ({
+    parentCategory,
+    items: items.sort((a, b) => a.name.localeCompare(b.name, 'ja')),
+  }))
+}
+
 export default function ListingPage() {
   const [listings, setListings] = useState<any[]>([])
-  const [categories, setCategories] = useState<any[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [categoryKeyword, setCategoryKeyword] = useState('')
+  const [categoryId, setCategoryId] = useState('')
   const [titleKeyword, setTitleKeyword] = useState('')
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
-  const [marketStats, setMarketStats] = useState<{
-    count: number
-    average: number
-    median: number
-    min: number
-    max: number
-  } | null>(null)
+  const [marketStats, setMarketStats] = useState<ProductMarketStats>(null)
   const [marketStatsLoading, setMarketStatsLoading] = useState(false)
+
   const router = useRouter()
 
   useEffect(() => {
@@ -39,20 +73,28 @@ export default function ListingPage() {
           .select('id')
           .eq('auth_id', user.id)
           .single()
+
         setProfile(userProfile)
       }
 
-      const { data: cats } = await supabase
+      const { data: cats, error: catsError } = await supabase
         .from('categories')
-        .select('*')
-        .order('name')
-      setCategories(cats || [])
+        .select('id, name, parent_category, sort_order')
+        .order('sort_order', { ascending: true })
+        .order('parent_category', { ascending: true })
+        .order('name', { ascending: true })
+
+      if (catsError) {
+        console.error('categories fetch error:', catsError)
+      }
+
+      setCategories((cats || []) as Category[])
 
       const { data, error } = await supabase
         .from('product_listings')
         .select(`
           *,
-          categories (name),
+          categories (name, parent_category),
           users:seller_user_id (display_name, twitter_handle)
         `)
         .eq('status', 'active')
@@ -70,6 +112,15 @@ export default function ListingPage() {
     init()
   }, [])
 
+  const groupedCategories = useMemo(() => {
+    return groupCategoriesByParent(categories)
+  }, [categories])
+
+  const selectedCategory = useMemo(() => {
+    if (!categoryId) return null
+    return categories.find((cat) => cat.id === Number(categoryId)) || null
+  }, [categoryId, categories])
+
   const getMedian = (numbers: number[]) => {
     if (numbers.length === 0) return 0
 
@@ -83,14 +134,8 @@ export default function ListingPage() {
     return sorted[middle]
   }
 
-  const loadMarketStats = async (categoryName: string) => {
-    if (!categoryName) {
-      setMarketStats(null)
-      return
-    }
-
-    const selectedCategory = categories.find((cat) => cat.name === categoryName)
-    if (!selectedCategory) {
+  const loadMarketStats = async (selectedCategoryId: string) => {
+    if (!selectedCategoryId) {
       setMarketStats(null)
       return
     }
@@ -100,15 +145,13 @@ export default function ListingPage() {
     try {
       const supabase = createClient()
 
-      const since = new Date()
-      since.setDate(since.getDate() - 90)
-
+      // product_purchases には created_at がないため、
+      // 現時点では作品相場は全件ベースで集計する。
       const { data, error } = await supabase
         .from('product_purchases')
-        .select('price, created_at')
-        .eq('category_id', selectedCategory.id)
-        .gte('created_at', since.toISOString())
-        .order('created_at', { ascending: false })
+        .select('price')
+        .eq('category_id', Number(selectedCategoryId))
+        .gt('price', 0)
 
       if (error) {
         console.error('market stats fetch error:', error)
@@ -144,8 +187,8 @@ export default function ListingPage() {
   }
 
   useEffect(() => {
-    loadMarketStats(categoryKeyword)
-  }, [categoryKeyword, categories])
+    loadMarketStats(categoryId)
+  }, [categoryId])
 
   const getCategoryName = (item: any) => {
     if (!item.categories) return '未分類'
@@ -158,12 +201,11 @@ export default function ListingPage() {
     const parsedMax = maxPrice.trim() === '' ? null : Number(maxPrice)
 
     return listings.filter((item) => {
-      const catName = getCategoryName(item)
       const title = item.title || ''
       const price = item.price
 
       const matchCategory =
-        categoryKeyword.trim() === '' || catName === categoryKeyword
+        categoryId.trim() === '' || Number(item.category_id) === Number(categoryId)
 
       const matchTitle =
         titleKeyword.trim() === '' ||
@@ -177,7 +219,7 @@ export default function ListingPage() {
 
       return matchCategory && matchTitle && matchMin && matchMax
     })
-  }, [listings, categoryKeyword, titleKeyword, minPrice, maxPrice])
+  }, [listings, categoryId, titleKeyword, minPrice, maxPrice])
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -187,6 +229,7 @@ export default function ListingPage() {
             <h1 className="text-4xl font-bold mb-2">作品マーケット</h1>
             <p className="text-gray-600">クリエイターの既製品を購入できます</p>
           </div>
+
           {profile && (
             <button
               onClick={() => router.push('/listing/new')}
@@ -198,28 +241,34 @@ export default function ListingPage() {
         </div>
 
         <ProductMarketStatsCard
-          selectedCategoryName={categoryKeyword}
+          selectedCategoryName={selectedCategory?.name || ''}
           stats={marketStats}
           loading={marketStatsLoading}
         />
 
         <div className="bg-white rounded-3xl shadow-xl p-8 mb-8">
           <h2 className="text-lg font-bold mb-4">作品を検索</h2>
+
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-2">
                 カテゴリ
               </label>
               <select
-                value={categoryKeyword}
-                onChange={(e) => setCategoryKeyword(e.target.value)}
-                className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200 bg-white"
               >
                 <option value="">すべての品目</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.name}>
-                    {cat.name}
-                  </option>
+
+                {groupedCategories.map((group) => (
+                  <optgroup key={group.parentCategory} label={group.parentCategory}>
+                    {group.items.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>
@@ -276,6 +325,7 @@ export default function ListingPage() {
         ) : filteredListings.length === 0 ? (
           <div className="text-center py-20">
             <p className="text-gray-500 text-lg mb-4">条件に合う作品がありません</p>
+
             {profile && (
               <button
                 onClick={() => router.push('/listing/new')}
@@ -306,6 +356,7 @@ export default function ListingPage() {
                         <div className="text-gray-400 text-4xl">🎨</div>
                       )}
                     </div>
+
                     <div className="p-5">
                       <p className="text-xs text-gray-500 mb-1">{catName}</p>
                       <h3 className="font-bold text-lg mb-2 truncate">{item.title}</h3>
