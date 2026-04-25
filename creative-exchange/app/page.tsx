@@ -34,25 +34,55 @@ const features = [
   },
 ]
 
+function BrandMark() {
+  return (
+    <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-3xl bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500 shadow-xl flex items-center justify-center overflow-hidden">
+      <div className="absolute inset-0 bg-white/10" />
+
+      <div className="absolute -top-5 -right-5 w-16 h-16 rounded-full bg-white/20" />
+      <div className="absolute -bottom-6 -left-6 w-20 h-20 rounded-full bg-black/10" />
+
+      <div className="relative z-10 text-white font-black text-2xl md:text-3xl tracking-tight">
+        CE
+      </div>
+
+      <div className="absolute bottom-5 left-5 right-5 h-6">
+        <div className="absolute bottom-0 left-0 w-3 h-2 rounded-sm bg-white/50" />
+        <div className="absolute bottom-0 left-5 w-3 h-4 rounded-sm bg-white/60" />
+        <div className="absolute bottom-0 left-10 w-3 h-6 rounded-sm bg-white/70" />
+      </div>
+    </div>
+  )
+}
+
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <section className="relative overflow-hidden bg-white">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-purple-50" />
 
-        <div className="relative max-w-6xl mx-auto px-4 py-20 md:py-28">
+        <div className="relative max-w-6xl mx-auto px-4 py-16 md:py-24">
           <div className="max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-sm font-medium mb-8">
-              Creative Exchange
+            <div className="flex flex-col items-center mb-8">
+              <BrandMark />
+
+              <div className="mt-5">
+                <div className="text-2xl md:text-3xl font-black tracking-tight text-gray-900">
+                  Creative Exchange
+                </div>
+                <div className="mt-2 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-xs md:text-sm font-medium">
+                  Creative Trading Platform
+                </div>
+              </div>
             </div>
 
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-gray-900 mb-6 leading-tight">
+            <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-gray-900 mb-6 leading-tight">
               クリエイターのための
               <br className="hidden md:block" />
               クリエイティブ取引所
             </h1>
 
-            <p className="text-xl md:text-2xl text-gray-700 mb-6">
+            <p className="text-lg md:text-2xl text-gray-700 mb-6 font-medium">
               依頼・受注・相場・作品販売をひとつの場所で。
             </p>
 
@@ -103,9 +133,7 @@ export default function HomePage() {
 
               <h3 className="text-xl font-bold mb-4">{feature.title}</h3>
 
-              <p className="text-gray-600 leading-7">
-                {feature.description}
-              </p>
+              <p className="text-gray-600 leading-7">{feature.description}</p>
             </div>
           ))}
         </div>
@@ -146,6 +174,12 @@ export default function HomePage() {
 
       <section className="max-w-6xl mx-auto px-4 py-16 md:py-20">
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl p-8 md:p-12 text-white text-center shadow-xl">
+          <div className="flex justify-center mb-6">
+            <div className="w-14 h-14 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center font-black text-xl">
+              CE
+            </div>
+          </div>
+
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
             クリエイティブ取引を、もっと見えるものに。
           </h2>
