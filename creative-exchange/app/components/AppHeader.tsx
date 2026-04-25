@@ -3,9 +3,23 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
+import { useEffect, useState } from 'react'
 
 export default function AppHeader() {
   const router = useRouter()
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      setIsLoggedIn(!!user)
+    }
+
+    checkAuth()
+  }, [])
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -22,55 +36,66 @@ export default function AppHeader() {
               Creative Exchange
             </Link>
 
-            <nav className="grid grid-cols-3 md:flex md:flex-wrap gap-2 md:gap-3 text-sm">
+            <nav className="grid grid-cols-2 md:flex md:flex-wrap gap-2 md:gap-3 text-sm">
               <Link
-                href="/"
+                href="/exchange?tab=creators"
                 className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-center"
               >
-                トップ
-              </Link>
-
-              <Link
-                href="/mypage"
-                className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-center"
-              >
-                マイページ
-              </Link>
-
-              <Link
-                href="/exchange"
-                className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-center"
-              >
-                Exchange
+                人を探す
               </Link>
 
               <Link
                 href="/listing"
                 className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-center"
               >
-                作品マーケット
+                作品を探す
+              </Link>
+
+              <Link
+                href="/exchange?tab=requests"
+                className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-center"
+              >
+                依頼を受ける
+              </Link>
+
+              <Link
+                href="/listing/new"
+                className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-center"
+              >
+                出品する
               </Link>
 
               <Link
                 href="/market"
                 className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-center"
               >
-                相場ボード
+                相場を確認する
               </Link>
 
-              <Link
-                href="/request/new"
-                className="px-3 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition text-center"
-              >
-                新しい依頼
-              </Link>
+              {isLoggedIn ? (
+                <>
+                  <Link
+                    href="/mypage"
+                    className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-center"
+                  >
+                    マイページ
+                  </Link>
 
-              <button
-                onClick={handleLogout}
-                className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-gray-700 text-center md:inline-block col-span-3 md:col-span-1"
-              >
-                ログアウト
-              </button>
+                  <button
+                    onClick={handleLogout}
+                    className="px-3 py-2 rounded-xl hover:bg-gray-100 transition text-gray-700 text-center col-span-2 md:col-span-1"
+                  >
+                    ログアウト
+                  </button>
+                </>
+              ) : (
+                <Link
+                  href="/login"
+                  className="px-3 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition text-center"
+                >
+                  ログイン
+                </Link>
+              )}
             </nav>
           </div>
         </div>
