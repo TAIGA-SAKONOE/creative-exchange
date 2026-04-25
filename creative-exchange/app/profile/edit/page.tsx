@@ -7,6 +7,13 @@ import { useRouter } from 'next/navigation'
 type CategoryOption = {
   id: number
   name: string
+  parent_category: string | null
+  sort_order: number | null
+}
+
+type CategoryGroup = {
+  parentCategory: string
+  items: CategoryOption[]
 }
 
 type SkillTag = {
@@ -17,6 +24,25 @@ type SkillTag = {
 }
 
 const PARENT_CATEGORIES = ['音楽', 'イラスト', '動画', '文章', 'その他']
+
+const groupCategoriesByParent = (categories: CategoryOption[]): CategoryGroup[] => {
+  const grouped = new Map<string, CategoryOption[]>()
+
+  categories.forEach((category) => {
+    const parent = category.parent_category || 'その他'
+
+    if (!grouped.has(parent)) {
+      grouped.set(parent, [])
+    }
+
+    grouped.get(parent)!.push(category)
+  })
+
+  return Array.from(grouped.entries()).map(([parentCategory, items]) => ({
+    parentCategory,
+    items: items.sort((a, b) => a.name.localeCompare(b.name, 'ja')),
+  }))
+}
 
 export default function ProfileEdit() {
   const [user, setUser] = useState<any>(null)
@@ -55,12 +81,18 @@ export default function ProfileEdit() {
 
       setUser(user)
 
-      const { data: categoryRows } = await supabase
+      const { data: categoryRows, error: categoryError } = await supabase
         .from('categories')
-        .select('id, name')
+        .select('id, name, parent_category, sort_order')
+        .order('sort_order', { ascending: true })
+        .order('parent_category', { ascending: true })
         .order('name', { ascending: true })
 
-      setCategories((categoryRows || []) as CategoryOption[])
+      if (categoryError) {
+        console.error('categories取得エラー:', categoryError)
+      } else {
+        setCategories((categoryRows || []) as CategoryOption[])
+      }
 
       const { data: tagRows, error: tagError } = await supabase
         .from('skill_tags')
@@ -158,6 +190,10 @@ export default function ProfileEdit() {
   const normalizeTagName = (value: string) => {
     return value.trim().replace(/\s+/g, ' ')
   }
+
+  const groupedCategories = useMemo(() => {
+    return groupCategoriesByParent(categories)
+  }, [categories])
 
   const toggleCategory = (categoryId: number) => {
     setSelectedCategoryIds((prev) => {
@@ -420,30 +456,50 @@ export default function ProfileEdit() {
 
           <div>
             <label className="block text-sm font-medium mb-3">納品できる品目</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {categories.map((category) => {
-                const checked = selectedCategoryIds.includes(category.id)
 
-                return (
-                  <label
-                    key={category.id}
-                    className={`flex items-center gap-3 px-4 py-3 border rounded-xl cursor-pointer transition ${
-                      checked
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleCategory(category.id)}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm">{category.name}</span>
-                  </label>
-                )
-              })}
+            <div className="space-y-5">
+              {groupedCategories.map((group) => (
+                <div
+                  key={group.parentCategory}
+                  className="border border-gray-200 rounded-2xl p-4 bg-gray-50"
+                >
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <h2 className="font-bold text-gray-900">
+                      {group.parentCategory}
+                    </h2>
+                    <span className="text-xs text-gray-500">
+                      {group.items.length}品目
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {group.items.map((category) => {
+                      const checked = selectedCategoryIds.includes(category.id)
+
+                      return (
+                        <label
+                          key={category.id}
+                          className={`flex items-center gap-3 px-4 py-3 border rounded-xl cursor-pointer transition bg-white ${
+                            checked
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleCategory(category.id)}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm">{category.name}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
+
             <p className="mt-2 text-sm text-gray-500">
               大まかな品目です。Exchange のクリエイター検索で使われます。
             </p>
