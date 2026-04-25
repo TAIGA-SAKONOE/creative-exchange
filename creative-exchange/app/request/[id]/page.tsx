@@ -53,6 +53,7 @@ export default function RequestDetail() {
   const [orderSteps, setOrderSteps] = useState<OrderStep[]>([])
   const [deliverables, setDeliverables] = useState<DeliverableFile[]>([])
   const [messages, setMessages] = useState<any[]>([])
+  const [reviewedStepIds, setReviewedStepIds] = useState<string[]>([])
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -240,6 +241,24 @@ export default function RequestDetail() {
         console.error('order_messages取得エラー', messagesError)
       } else {
         setMessages(messageRows ?? [])
+      }
+
+      const { data: reviewRows, error: reviewsError } = await supabase
+        .from('reviews')
+        .select('order_step_id')
+        .eq('order_id', id)
+        .eq('reviewer_id', userProfile.id)
+        .not('order_step_id', 'is', null)
+
+      if (reviewsError) {
+        console.error('reviews取得エラー', reviewsError)
+        setReviewedStepIds([])
+      } else {
+        setReviewedStepIds(
+          (reviewRows ?? [])
+            .map((review: any) => review.order_step_id)
+            .filter(Boolean)
+        )
       }
     } catch (err: any) {
       setError(err.message || 'データの読み込み中にエラーが発生しました')
@@ -995,9 +1014,12 @@ export default function RequestDetail() {
                         String(request.client_id) === String(profile.id) &&
                         step.status === 'delivered'
 
+                      const hasReviewedThisStep = reviewedStepIds.includes(step.id)
+
                       const canReviewThisStep =
                         profile?.id &&
                         step.status === 'completed' &&
+                        !hasReviewedThisStep &&
                         (String(request.client_id) === String(profile.id) ||
                           String(step.creator_id) === String(profile.id))
 
@@ -1222,6 +1244,12 @@ export default function RequestDetail() {
                                 >
                                   この工程を評価する
                                 </Link>
+                              </div>
+                            )}
+
+                            {hasReviewedThisStep && (
+                              <div className="mt-5 p-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-600">
+                                この工程は評価済みです。
                               </div>
                             )}
                           </div>
