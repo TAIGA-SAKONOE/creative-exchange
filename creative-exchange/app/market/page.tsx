@@ -1,7 +1,8 @@
 'use client'
 
 import { createClient } from '../../lib/supabase/client'
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import LoadingState from '../components/LoadingState'
 import MessageState from '../components/MessageState'
@@ -29,11 +30,35 @@ type CategoryRow = {
 }
 
 export default function MarketPage() {
-  const [activeTab, setActiveTab] = useState<'requests' | 'products'>('requests')
+  return (
+    <Suspense fallback={<LoadingState message="相場データを読み込み中..." />}>
+      <MarketPageContent />
+    </Suspense>
+  )
+}
+
+function MarketPageContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const initialTab =
+    searchParams.get('tab') === 'product' ? 'products' : 'requests'
+
+  const [activeTab, setActiveTab] = useState<'requests' | 'products'>(initialTab)
   const [requestMarketData, setRequestMarketData] = useState<any[]>([])
   const [productMarketData, setProductMarketData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+
+    if (tabParam === 'product') {
+      setActiveTab('products')
+    } else {
+      setActiveTab('requests')
+    }
+  }, [searchParams])
 
   useEffect(() => {
     const fetchMarketData = async () => {
@@ -54,6 +79,7 @@ export default function MarketPage() {
 
         const getMedian = (numbers: number[]) => {
           if (numbers.length === 0) return 0
+
           const sorted = [...numbers].sort((a, b) => a - b)
           const middle = Math.floor(sorted.length / 2)
 
@@ -173,6 +199,16 @@ export default function MarketPage() {
     fetchMarketData()
   }, [])
 
+  const handleTabChange = (nextTab: 'requests' | 'products') => {
+    setActiveTab(nextTab)
+
+    if (nextTab === 'requests') {
+      router.replace('/market?tab=commission')
+    } else {
+      router.replace('/market?tab=product')
+    }
+  }
+
   if (loading) {
     return <LoadingState message="相場データを読み込み中..." />
   }
@@ -203,7 +239,7 @@ export default function MarketPage() {
         <div className="bg-white rounded-3xl shadow-xl p-3 mb-8">
           <div className="flex gap-2 flex-wrap">
             <button
-              onClick={() => setActiveTab('requests')}
+              onClick={() => handleTabChange('requests')}
               className={`px-5 py-3 rounded-2xl font-medium transition ${
                 activeTab === 'requests'
                   ? 'bg-blue-600 text-white shadow-sm'
@@ -214,7 +250,7 @@ export default function MarketPage() {
             </button>
 
             <button
-              onClick={() => setActiveTab('products')}
+              onClick={() => handleTabChange('products')}
               className={`px-5 py-3 rounded-2xl font-medium transition ${
                 activeTab === 'products'
                   ? 'bg-blue-600 text-white shadow-sm'
@@ -267,6 +303,7 @@ export default function MarketPage() {
                           ).toLocaleString()}
                         </p>
                       </div>
+
                       <div>
                         <p className="text-gray-500">上位25%</p>
                         <p>
