@@ -3,8 +3,11 @@
 import { createClient } from '../../lib/supabase/client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 export default function MyPage() {
+  const router = useRouter()
+
   const [user, setUser] = useState<any>(null)
   const [requests, setRequests] = useState<any[]>([])
   const [receivedOrders, setReceivedOrders] = useState<any[]>([])
@@ -23,7 +26,7 @@ export default function MyPage() {
       } = await supabase.auth.getUser()
 
       if (!authUser) {
-        window.location.href = '/login'
+        router.replace('/login')
         return
       }
 
@@ -120,7 +123,34 @@ export default function MyPage() {
     }
 
     loadMyPage()
-  }, [])
+  }, [router])
+
+  const handleNotificationClick = async (notification: any) => {
+    if (!notification?.id) return
+
+    const targetUrl = notification.link_url || '/mypage'
+
+    if (!notification.is_read) {
+      setNotifications((prev) =>
+        prev.map((item) =>
+          item.id === notification.id ? { ...item, is_read: true } : item
+        )
+      )
+
+      const supabase = createClient()
+
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notification.id)
+
+      if (error) {
+        console.error('notification read update error:', error)
+      }
+    }
+
+    router.push(targetUrl)
+  }
 
   const getStatusLabel = (status: string) => {
     if (status === 'draft') return '下書き'
@@ -193,9 +223,12 @@ export default function MyPage() {
             <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-blue-500 rounded-3xl flex items-center justify-center text-6xl text-white shadow-inner">
               👤
             </div>
+
             <div className="flex-1">
               <h2 className="text-4xl font-bold mb-1">{user.display_name}</h2>
-              <p className="text-2xl text-gray-600">@{user.twitter_handle || '未設定'}</p>
+              <p className="text-2xl text-gray-600">
+                @{user.twitter_handle || '未設定'}
+              </p>
 
               {user.bio && (
                 <p className="mt-6 text-lg text-gray-700 leading-relaxed">
@@ -204,7 +237,9 @@ export default function MyPage() {
               )}
 
               <div className="mt-6">
-                <p className="text-sm font-medium text-gray-500 mb-2">納品できる品目</p>
+                <p className="text-sm font-medium text-gray-500 mb-2">
+                  納品できる品目
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {userCategoryNames.length > 0 ? (
                     userCategoryNames.map((name) => (
@@ -222,8 +257,12 @@ export default function MyPage() {
               </div>
 
               <div className="mt-6">
-                <p className="text-sm font-medium text-gray-500 mb-2">補足スキル・得意領域</p>
-                <p className="text-gray-700 leading-relaxed">{getSkillText(user.skills)}</p>
+                <p className="text-sm font-medium text-gray-500 mb-2">
+                  補足スキル・得意領域
+                </p>
+                <p className="text-gray-700 leading-relaxed">
+                  {getSkillText(user.skills)}
+                </p>
               </div>
             </div>
           </div>
@@ -270,33 +309,59 @@ export default function MyPage() {
               まだ通知はありません
             </div>
           ) : (
-            <div className="max-h-[420px] overflow-y-auto pr-2 grid gap-4">
-              {notifications.map((notification) => (
-                <Link
-                  key={notification.id}
-                  href={notification.link_url || '/mypage'}
-                  className="group border border-gray-200 hover:border-blue-300 hover:shadow-md rounded-2xl p-5 transition-all duration-300"
-                >
-                  <div className="flex justify-between items-start gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-lg font-semibold mb-1 group-hover:text-blue-600 transition-colors">
-                        {notification.title}
-                      </div>
-                      {notification.body && (
-                        <div className="text-gray-600 whitespace-pre-wrap leading-relaxed">
-                          {notification.body}
-                        </div>
-                      )}
-                    </div>
+            <div className="grid gap-4 max-h-[420px] overflow-y-auto pr-2">
+              {notifications.map((notification) => {
+                const isUnread = !notification.is_read
 
-                    <div className="text-right shrink-0 text-xs text-gray-500">
-                      {notification.created_at
-                        ? new Date(notification.created_at).toLocaleString('ja-JP')
-                        : ''}
+                return (
+                  <button
+                    key={notification.id}
+                    type="button"
+                    onClick={() => handleNotificationClick(notification)}
+                    className={`group w-full text-left border rounded-2xl p-5 transition-all duration-300 ${
+                      isUnread
+                        ? 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-md'
+                        : 'bg-gray-50 border-gray-100 hover:border-gray-200'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          {isUnread && (
+                            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
+                          )}
+
+                          <div
+                            className={`text-lg font-semibold transition-colors ${
+                              isUnread
+                                ? 'text-gray-900 group-hover:text-blue-600'
+                                : 'text-gray-500'
+                            }`}
+                          >
+                            {notification.title}
+                          </div>
+                        </div>
+
+                        {notification.body && (
+                          <div
+                            className={`whitespace-pre-wrap leading-relaxed ${
+                              isUnread ? 'text-gray-600' : 'text-gray-500'
+                            }`}
+                          >
+                            {notification.body}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="text-right shrink-0 text-xs text-gray-500">
+                        {notification.created_at
+                          ? new Date(notification.created_at).toLocaleString('ja-JP')
+                          : ''}
+                      </div>
                     </div>
-                  </div>
-                </Link>
-              ))}
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
@@ -314,7 +379,7 @@ export default function MyPage() {
               「新しい依頼を作成」から初めてみましょう
             </div>
           ) : (
-            <div className="max-h-[520px] overflow-y-auto pr-2 grid gap-6">
+            <div className="grid gap-6 max-h-[520px] overflow-y-auto pr-2">
               {requests.map((req) => (
                 <Link
                   key={req.id}
@@ -364,7 +429,7 @@ export default function MyPage() {
               Exchange から公開依頼を探してみましょう
             </div>
           ) : (
-            <div className="max-h-[520px] overflow-y-auto pr-2 grid gap-6">
+            <div className="grid gap-6 max-h-[520px] overflow-y-auto pr-2">
               {receivedOrders.map((order) => (
                 <Link
                   key={order.id}
@@ -405,10 +470,15 @@ export default function MyPage() {
           <div className="flex items-center justify-between mb-8">
             <div>
               <h2 className="text-2xl font-bold">あなたの出品一覧</h2>
-              <p className="text-sm text-gray-500 mt-2">作品マーケットに出品した既製品です</p>
+              <p className="text-sm text-gray-500 mt-2">
+                作品マーケットに出品した既製品です
+              </p>
             </div>
+
             <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-500">{productListings.length}件</span>
+              <span className="text-sm text-gray-500">
+                {productListings.length}件
+              </span>
               <Link
                 href="/listing/new"
                 className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-2xl font-medium transition"
@@ -425,7 +495,7 @@ export default function MyPage() {
               「作品を出品する」から既製品を登録できます
             </div>
           ) : (
-            <div className="max-h-[520px] overflow-y-auto pr-2 grid gap-6">
+            <div className="grid gap-6 max-h-[620px] overflow-y-auto pr-2">
               {productListings.map((listing) => {
                 const imageUrl = getFirstImage(listing.image_urls)
 
@@ -486,9 +556,13 @@ export default function MyPage() {
           <div className="flex items-center justify-between mb-8">
             <div>
               <h2 className="text-2xl font-bold">あなたの購入履歴</h2>
-              <p className="text-sm text-gray-500 mt-2">作品マーケットで購入した既製品です</p>
+              <p className="text-sm text-gray-500 mt-2">
+                作品マーケットで購入した既製品です
+              </p>
             </div>
-            <span className="text-sm text-gray-500">{productPurchases.length}件</span>
+            <span className="text-sm text-gray-500">
+              {productPurchases.length}件
+            </span>
           </div>
 
           {productPurchases.length === 0 ? (
@@ -498,7 +572,7 @@ export default function MyPage() {
               作品マーケットから既製品を探してみましょう
             </div>
           ) : (
-            <div className="max-h-[420px] overflow-y-auto pr-2 grid gap-6">
+            <div className="grid gap-6 max-h-[620px] overflow-y-auto pr-2">
               {productPurchases.map((purchase) => {
                 const listing = Array.isArray(purchase.product_listings)
                   ? purchase.product_listings[0]
