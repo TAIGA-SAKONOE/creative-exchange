@@ -170,7 +170,7 @@ function NewRequestContent() {
           category_id: parseInt(selectedCategory, 10),
           title: title.trim(),
           description: description.trim(),
-          agreed_price: budget ? parseInt(budget, 10) : null,
+          agreed_price: budget ? parseInt(budget, 10) : 0,
           deadline: deadline || null,
           specification: {
             note: directedCreator ? '指名依頼' : '基本依頼',
