@@ -97,6 +97,9 @@ export default function RequestDetail() {
   const [applyingStepId, setApplyingStepId] = useState<string | null>(null)
   const [acceptingApplicationId, setAcceptingApplicationId] = useState<string | null>(null)
 
+  const [withdrawingStepId, setWithdrawingStepId] = useState<string | null>(null)
+  const [reopeningStepId, setReopeningStepId] = useState<string | null>(null)
+
   const [cancelling, setCancelling] = useState(false)
 
   const stepFileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
@@ -495,6 +498,141 @@ export default function RequestDetail() {
       alert('採用に失敗しました: ' + err.message)
     } finally {
       setAcceptingApplicationId(null)
+    }
+  }
+
+  const handleWithdrawAssignedStep = async (step: OrderStep) => {
+    if (!profile?.id || !request) return
+
+    if (String(step.creator_id) !== String(profile.id)) {
+      alert('この工程の担当クリエイターのみ辞退できます')
+      return
+    }
+
+    if (step.status !== 'matched') {
+      alert('この工程は現在辞退できる状態ではありません')
+      return
+    }
+
+    const confirmed = window.confirm(
+      `工程「${step.title}」を辞退しますか？\n辞退すると、この工程は再び募集中になります。`
+    )
+
+    if (!confirmed) return
+
+    setWithdrawingStepId(step.id)
+
+    try {
+      const supabase = createClient()
+
+      const { error: stepError } = await supabase
+        .from('order_steps')
+        .update({
+          creator_id: null,
+          status: 'open',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', step.id)
+        .eq('creator_id', profile.id)
+        .eq('status', 'matched')
+
+      if (stepError) throw stepError
+
+      const { error: applicationError } = await supabase
+        .from('order_step_applications')
+        .update({
+          status: 'cancelled',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('order_step_id', step.id)
+        .eq('applicant_id', profile.id)
+        .eq('status', 'accepted')
+
+      if (applicationError) throw applicationError
+
+      await createNotification({
+        userId: request.client_id,
+        type: 'order_step_withdrawn',
+        title: '工程担当者が辞退しました',
+        body: `「${request.title}」の工程「${step.title}」で担当クリエイターが辞退しました。工程は再募集になりました。`,
+        linkUrl: `/request/${id}`,
+      })
+
+      alert('工程を辞退しました。工程は再募集になりました。')
+      loadData()
+    } catch (err: any) {
+      alert('辞退処理に失敗しました: ' + err.message)
+    } finally {
+      setWithdrawingStepId(null)
+    }
+  }
+
+  const handleReopenAssignedStep = async (step: OrderStep) => {
+    if (!profile?.id || !request) return
+
+    if (String(request.client_id) !== String(profile.id)) {
+      alert('依頼者本人のみ再募集できます')
+      return
+    }
+
+    if (step.status !== 'matched') {
+      alert('この工程は現在再募集できる状態ではありません')
+      return
+    }
+
+    const previousCreatorId = step.creator_id
+
+    const confirmed = window.confirm(
+      `工程「${step.title}」の担当を解除して再募集しますか？`
+    )
+
+    if (!confirmed) return
+
+    setReopeningStepId(step.id)
+
+    try {
+      const supabase = createClient()
+
+      const { error: stepError } = await supabase
+        .from('order_steps')
+        .update({
+          creator_id: null,
+          status: 'open',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', step.id)
+        .eq('order_id', id)
+        .eq('status', 'matched')
+
+      if (stepError) throw stepError
+
+      const { error: applicationError } = await supabase
+        .from('order_step_applications')
+        .update({
+          status: 'cancelled',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('order_step_id', step.id)
+        .eq('status', 'accepted')
+
+      if (applicationError) throw applicationError
+
+      if (previousCreatorId) {
+        await createNotification({
+          userId: previousCreatorId,
+          type: 'order_step_reopened',
+          title: '工程が再募集になりました',
+          body: `「${request.title}」の工程「${step.title}」が再募集になりました。`,
+          linkUrl: `/request/${id}`,
+        })
+      }
+
+      alert('工程を再募集に戻しました')
+      loadData()
+    } catch (err: any) {
+      alert('再募集に失敗しました: ' + err.message)
+    } finally {
+      setReopeningStepId(null)
     }
   }
 
@@ -994,7 +1132,7 @@ export default function RequestDetail() {
 
     if (status === 'cancelled') {
       return {
-        label: '辞退',
+        label: '辞退・解除済み',
         className: 'bg-gray-100 text-gray-600 border border-gray-200',
       }
     }
@@ -1383,6 +1521,16 @@ export default function RequestDetail() {
                               String(step.creator_id) === String(profile.id) &&
                               step.status === 'matched'
 
+                            const canWithdrawThisStep =
+                              profile?.id &&
+                              String(step.creator_id) === String(profile.id) &&
+                              step.status === 'matched'
+
+                            const canReopenThisStep =
+                              profile?.id &&
+                              String(request.client_id) === String(profile.id) &&
+                              step.status === 'matched'
+
                             const canCompleteThisStep =
                               profile?.id &&
                               String(request.client_id) === String(profile.id) &&
@@ -1614,6 +1762,46 @@ export default function RequestDetail() {
                                           {myApplication.message}
                                         </p>
                                       )}
+                                    </div>
+                                  )}
+
+                                  {canWithdrawThisStep && (
+                                    <div className="mt-5 p-5 bg-red-50 border border-red-100 rounded-2xl">
+                                      <p className="font-medium text-red-700 mb-2">
+                                        この工程を辞退する
+                                      </p>
+                                      <p className="text-sm text-red-700 leading-7 mb-4">
+                                        辞退すると、この工程は再び募集中になります。
+                                      </p>
+                                      <button
+                                        onClick={() => handleWithdrawAssignedStep(step)}
+                                        disabled={withdrawingStepId === step.id}
+                                        className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white py-4 rounded-2xl font-medium shadow-sm"
+                                      >
+                                        {withdrawingStepId === step.id
+                                          ? '辞退処理中...'
+                                          : 'この工程を辞退する'}
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {canReopenThisStep && (
+                                    <div className="mt-5 p-5 bg-gray-50 border border-gray-200 rounded-2xl">
+                                      <p className="font-medium text-gray-800 mb-2">
+                                        担当を解除して再募集する
+                                      </p>
+                                      <p className="text-sm text-gray-600 leading-7 mb-4">
+                                        現在の担当クリエイターを解除し、この工程を再び募集中に戻します。
+                                      </p>
+                                      <button
+                                        onClick={() => handleReopenAssignedStep(step)}
+                                        disabled={reopeningStepId === step.id}
+                                        className="w-full border border-gray-300 hover:bg-gray-100 disabled:bg-gray-200 disabled:text-gray-400 text-gray-800 py-4 rounded-2xl font-medium shadow-sm"
+                                      >
+                                        {reopeningStepId === step.id
+                                          ? '再募集処理中...'
+                                          : 'この工程を再募集する'}
+                                      </button>
                                     </div>
                                   )}
 
