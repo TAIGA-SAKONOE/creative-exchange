@@ -271,7 +271,11 @@ export default function RequestDetail() {
       let targetUserId: string | null = null
 
       if (request.status === 'open') {
-        targetUserId = request.client_id === profile.id ? null : request.client_id
+        if (String(request.client_id) === String(profile.id)) {
+          targetUserId = request.creator_id || null
+        } else {
+          targetUserId = request.client_id
+        }
       } else {
         if (String(request.client_id) === String(profile.id)) {
           targetUserId = request.creator_id || null
