@@ -82,6 +82,7 @@ export default function ProfileEdit() {
   const [bio, setBio] = useState('')
   const [skillsText, setSkillsText] = useState('')
   const [portfolioText, setPortfolioText] = useState('')
+  const [isAcceptingOrders, setIsAcceptingOrders] = useState(true)
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
@@ -151,6 +152,7 @@ export default function ProfileEdit() {
         setDisplayName(profile.display_name || user.user_metadata?.name || '')
         setBio(profile.bio || '')
         setAvatarUrl(profile.avatar_url || null)
+        setIsAcceptingOrders(profile.is_accepting_orders !== false)
         if (profile.avatar_url) {
           setAvatarPreview(profile.avatar_url)
         }
@@ -429,6 +431,7 @@ export default function ProfileEdit() {
             portfolio_urls: portfolioUrls.length > 0 ? portfolioUrls : [],
             avatar_url: savedAvatarUrl,
             twitter_handle: user.user_metadata?.preferred_username || null,
+            is_accepting_orders: isAcceptingOrders,
             updated_at: new Date().toISOString(),
           },
           { onConflict: 'auth_id' }
@@ -635,6 +638,44 @@ export default function ProfileEdit() {
                 className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-black resize-y"
                 placeholder="簡単な自己紹介を入力してください"
               />
+            </div>
+          </div>
+
+          {/* 受付設定 */}
+          <div className="bg-white rounded-2xl shadow p-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold">依頼受付設定</h2>
+                <p className="mt-2 text-sm text-gray-500 leading-6">
+                  受付中にすると、クリエイターページで依頼ボタンが表示されます。
+                  受付停止中は新規依頼を受け付けません。
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAcceptingOrders((prev) => !prev)}
+                className={`relative inline-flex h-8 w-16 shrink-0 items-center rounded-full transition ${
+                  isAcceptingOrders ? 'bg-blue-600' : 'bg-gray-300'
+                }`}
+                aria-pressed={isAcceptingOrders}
+              >
+                <span
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition ${
+                    isAcceptingOrders ? 'translate-x-9' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div
+              className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-medium ${
+                isAcceptingOrders
+                  ? 'border-blue-100 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 bg-gray-50 text-gray-600'
+              }`}
+            >
+              現在の状態：{isAcceptingOrders ? '依頼受付中' : '受付停止中'}
             </div>
           </div>
 
