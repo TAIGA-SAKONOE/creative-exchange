@@ -86,10 +86,14 @@ export default function AppHeader() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <Link
               href="/"
-              className="text-2xl md:text-xl font-bold tracking-tight"
+              className="flex items-center"
               onClick={closeDropdowns}
             >
-              Creative Exchange
+              <img
+                src="/logo-symbol.png"
+                alt="Creative Exchange"
+                className="h-10 w-auto"
+              />
             </Link>
 
             <nav className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3 text-sm">
