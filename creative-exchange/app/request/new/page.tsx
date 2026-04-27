@@ -159,7 +159,8 @@ function NewRequestContent() {
       } = await supabase.auth.getUser()
 
       if (!authUser) {
-        router.replace('/login')
+        const currentPath = `${window.location.pathname}${window.location.search}`
+        router.replace(`/login?redirect_to=${encodeURIComponent(currentPath)}`)
         return
       }
 
