@@ -33,6 +33,7 @@ type CategoryGroup = {
 }
 
 type RequestType = 'public' | 'named'
+type OrderType = 'simple' | 'standard' | 'multi_step' | 'competition'
 
 type RequestStepInput = {
   title: string
@@ -93,6 +94,7 @@ function NewRequestContent() {
   const [categories, setCategories] = useState<CategoryOption[]>([])
 
   const [requestType, setRequestType] = useState<RequestType>('public')
+  const [orderType, setOrderType] = useState<OrderType>('standard')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [steps, setSteps] = useState<RequestStepInput[]>([createEmptyStep(0)])
@@ -114,7 +116,9 @@ function NewRequestContent() {
   const typeParam = searchParams.get('type')
 
   const isNamedRequest = requestType === 'named'
-  const isMultiStep = steps.length >= 2
+  const isSimpleRequest = orderType === 'simple'
+  const isCompetitionRequest = orderType === 'competition'
+  const isMultiStep = orderType === 'multi_step' || steps.length >= 2
 
   const today = useMemo(() => {
     const now = new Date()
@@ -174,6 +178,15 @@ function NewRequestContent() {
 
       if (typeParam === 'named') {
         setRequestType('named')
+      }
+
+      if (
+        typeParam === 'simple' ||
+        typeParam === 'standard' ||
+        typeParam === 'multi_step' ||
+        typeParam === 'competition'
+      ) {
+        setOrderType(typeParam)
       }
 
       if (creatorIdParam) {
@@ -280,6 +293,7 @@ function NewRequestContent() {
   }
 
   const addStep = () => {
+    setOrderType('multi_step')
     setSteps((prev) => {
       if (prev.length >= 10) {
         alert('工程は最大10個までです')
@@ -358,6 +372,30 @@ function NewRequestContent() {
     updateStep(index, 'creator_search', '')
     updateStep(index, 'creator_candidates', [])
     updateStep(index, 'creator_dropdown_open', false)
+  }
+
+  const handleOrderTypeChange = (nextOrderType: OrderType) => {
+    setOrderType(nextOrderType)
+
+    if (nextOrderType === 'simple' || nextOrderType === 'standard' || nextOrderType === 'competition') {
+      setSteps((prev) => {
+        const firstStep = prev[0] || createEmptyStep(0)
+        return [
+          {
+            ...firstStep,
+            title:
+              nextOrderType === 'simple'
+                ? firstStep.title || 'かんたん依頼'
+                : firstStep.title || '制作工程',
+            parallel_group: '',
+          },
+        ]
+      })
+    }
+
+    if (nextOrderType === 'competition') {
+      setRequestType('public')
+    }
   }
 
   const validateSteps = () => {
@@ -532,14 +570,19 @@ function NewRequestContent() {
           specification: {
             note: isNamedRequest ? '指名依頼' : '公開依頼',
             request_type: requestType,
+            order_type: orderType,
+            simple_mode: isSimpleRequest,
+            no_revision: isSimpleRequest,
+            competition_mode: isCompetitionRequest,
             initial_named_creator_id: initialNamedCreator?.id || null,
-            phase: 'G-2',
+            phase: 'I-2',
             workflow: 'order_steps',
           },
           status: 'open',
           is_named: isNamedRequest,
-          is_multi_step: normalizedSteps.length >= 2,
+          is_multi_step: orderType === 'multi_step' || normalizedSteps.length >= 2,
           total_steps: normalizedSteps.length,
+          order_type: orderType,
         })
         .select('id')
         .single()
@@ -577,9 +620,13 @@ function NewRequestContent() {
       alert(
         isNamedRequest
           ? '指名依頼を作成しました！'
-          : isMultiStep
-            ? '工程付き公開依頼を作成しました！'
-            : '公開依頼を作成しました！'
+          : isSimpleRequest
+            ? 'かんたん依頼を作成しました！'
+            : isCompetitionRequest
+              ? 'コンペ依頼を作成しました！'
+              : isMultiStep
+                ? '工程付き公開依頼を作成しました！'
+                : '通常依頼を作成しました！'
       )
 
       router.push(`/request/${createdOrder.id}`)
@@ -606,15 +653,87 @@ function NewRequestContent() {
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-3">新しい依頼を作成</h1>
             <p className="text-gray-500">
-              公開依頼、または工程ごとの指名依頼として作成できます。
+              かんたん依頼・通常依頼・工程管理依頼・コンペ依頼を作成できます。
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-10">
             <div className="space-y-6">
+              <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm">
+                <label className="block text-sm font-medium text-gray-700 mb-4">
+                  依頼形式
+                </label>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[
+                    {
+                      value: 'simple' as OrderType,
+                      title: 'かんたん依頼',
+                      description: '3ステップ・やり取り少なめ・修正なし前提。まず軽く依頼したい方向けです。',
+                    },
+                    {
+                      value: 'standard' as OrderType,
+                      title: '通常依頼',
+                      description: '単一工程で、内容・予算・納期を指定して公開または指名します。',
+                    },
+                    {
+                      value: 'multi_step' as OrderType,
+                      title: '工程管理依頼',
+                      description: '作詞・イラスト・動画など複数工程を分けて募集・管理します。',
+                    },
+                    {
+                      value: 'competition' as OrderType,
+                      title: 'コンペ依頼',
+                      description: '提案を集めてから採用する形式です。詳細機能は次フェーズで拡張します。',
+                    },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => handleOrderTypeChange(option.value)}
+                      className={`text-left rounded-2xl border p-5 transition ${
+                        orderType === option.value
+                          ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-100'
+                          : 'border-gray-200 bg-white hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <span
+                          className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                            orderType === option.value
+                              ? 'border-blue-600 bg-blue-600'
+                              : 'border-gray-300'
+                          }`}
+                        >
+                          {orderType === option.value && (
+                            <span className="w-2 h-2 bg-white rounded-full" />
+                          )}
+                        </span>
+                        <span className="font-bold">{option.title}</span>
+                      </div>
+                      <p className="text-sm text-gray-600 leading-6">
+                        {option.description}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+
+                {isSimpleRequest && (
+                  <div className="mt-4 bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-800 leading-7">
+                    かんたん依頼は単一工程で作成されます。修正なし前提のライトな依頼として扱います。
+                  </div>
+                )}
+
+                {isCompetitionRequest && (
+                  <div className="mt-4 bg-purple-50 border border-purple-200 rounded-2xl p-4 text-sm text-purple-800 leading-7">
+                    コンペ依頼として作成されます。提案・採用UIは次工程で追加します。
+                  </div>
+                )}
+              </div>
+
               <div className="bg-gray-50 border border-gray-200 rounded-3xl p-6">
                 <label className="block text-sm font-medium text-gray-700 mb-4">
-                  依頼タイプ
+                  公開 / 指名
                 </label>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -648,9 +767,15 @@ function NewRequestContent() {
 
                   <button
                     type="button"
-                    onClick={() => setRequestType('named')}
+                    onClick={() => {
+                      if (isCompetitionRequest) return
+                      setRequestType('named')
+                    }}
+                    disabled={isCompetitionRequest}
                     className={`text-left rounded-2xl border p-5 transition ${
-                      requestType === 'named'
+                      isCompetitionRequest
+                        ? 'border-gray-200 bg-gray-100 opacity-60 cursor-not-allowed'
+                        : requestType === 'named'
                         ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-100'
                         : 'border-gray-200 bg-white hover:bg-gray-50'
                     }`}
@@ -716,7 +841,7 @@ function NewRequestContent() {
                 <div>
                   <h2 className="text-2xl font-bold">工程</h2>
                   <p className="text-sm text-gray-500 mt-2">
-                    1工程なら通常依頼、2工程以上なら工程管理依頼になります。
+                    かんたん依頼・通常依頼・コンペ依頼は単一工程、工程管理依頼は複数工程で作成できます。
                   </p>
                 </div>
 
@@ -727,10 +852,10 @@ function NewRequestContent() {
                   <button
                     type="button"
                     onClick={addStep}
-                    disabled={steps.length >= 10}
+                    disabled={steps.length >= 10 || isSimpleRequest || isCompetitionRequest}
                     className="px-5 py-3 rounded-2xl bg-gray-900 hover:bg-black disabled:bg-gray-400 text-white font-medium transition"
                   >
-                    工程を追加する
+                    {isSimpleRequest || isCompetitionRequest ? '単一工程固定' : '工程を追加する'}
                   </button>
                 </div>
               </div>
@@ -1031,16 +1156,22 @@ function NewRequestContent() {
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                   <div>
-                    <p className="text-gray-500 mb-1">依頼タイプ</p>
+                    <p className="text-gray-500 mb-1">依頼形式</p>
                     <p className="font-bold">
-                      {isNamedRequest ? '指名依頼' : '公開依頼'}
+                      {isSimpleRequest
+                        ? 'かんたん依頼'
+                        : isCompetitionRequest
+                          ? 'コンペ依頼'
+                          : orderType === 'multi_step'
+                            ? '工程管理依頼'
+                            : '通常依頼'}
                     </p>
                   </div>
 
                   <div>
-                    <p className="text-gray-500 mb-1">依頼形式</p>
+                    <p className="text-gray-500 mb-1">公開 / 指名</p>
                     <p className="font-bold">
-                      {isMultiStep ? '工程管理依頼' : '単一工程依頼'}
+                      {isNamedRequest ? '指名依頼' : '公開依頼'}
                     </p>
                   </div>
 
@@ -1071,6 +1202,18 @@ function NewRequestContent() {
                   </div>
                 )}
 
+                {isSimpleRequest && (
+                  <div className="mt-5 p-4 bg-blue-50 border border-blue-200 rounded-2xl text-sm text-blue-800 leading-7">
+                    かんたん依頼として作成されます。やり取り少なめ・修正なし前提のライトな依頼です。
+                  </div>
+                )}
+
+                {isCompetitionRequest && (
+                  <div className="mt-5 p-4 bg-purple-50 border border-purple-200 rounded-2xl text-sm text-purple-800 leading-7">
+                    コンペ依頼として作成されます。提案募集・採用機能は次工程で拡張します。
+                  </div>
+                )}
+
                 {isNamedRequest && (
                   <div className="mt-5 p-4 bg-blue-50 border border-blue-200 rounded-2xl text-sm text-blue-800 leading-7">
                     指名依頼として作成されます。各工程は選択したクリエイターに即時割り当てられ、
@@ -1089,9 +1232,13 @@ function NewRequestContent() {
                 ? '依頼を作成中...'
                 : isNamedRequest
                   ? '指名依頼を作成する'
-                  : isMultiStep
-                    ? '工程付き公開依頼を作成する'
-                    : '公開依頼を作成する'}
+                  : isSimpleRequest
+                    ? 'かんたん依頼を作成する'
+                    : isCompetitionRequest
+                      ? 'コンペ依頼を作成する'
+                      : isMultiStep
+                        ? '工程付き公開依頼を作成する'
+                        : '通常依頼を作成する'}
             </button>
           </form>
         </div>
