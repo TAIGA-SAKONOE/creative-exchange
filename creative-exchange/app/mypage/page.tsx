@@ -635,6 +635,15 @@ export default function MyPage() {
             </div>
           )}
         </div>
+
+        <div className="mt-10 pt-6 border-t border-gray-200 text-center">
+          <Link
+            href="/mypage/delete"
+            className="text-sm text-red-500 hover:text-red-700"
+          >
+            退会する
+          </Link>
+        </div>
       </div>
     </div>
   )
