@@ -33,6 +33,7 @@ type CreatorReview = {
   rating: number | null
   comment: string | null
   role: string | null
+  review_type: 'creator_review' | 'client_review' | null
   created_at: string | null
   reviewer_name: string
   reviewer_handle: string | null
@@ -172,7 +173,7 @@ export default function CreatorProfile() {
         // レビュー
         const { data: reviews } = await supabase
           .from('reviews')
-          .select(`id, order_id, order_step_id, reviewer_id, reviewee_id, rating, comment, role, created_at`)
+          .select(`id, order_id, order_step_id, reviewer_id, reviewee_id, rating, comment, role, review_type, created_at`)
           .eq('reviewee_id', creatorId)
           .order('created_at', { ascending: false })
 
@@ -211,6 +212,7 @@ export default function CreatorProfile() {
               rating: review.rating,
               comment: review.comment,
               role: review.role,
+              review_type: review.review_type || 'creator_review',
               created_at: review.created_at,
               reviewer_name: reviewer?.display_name || reviewer?.twitter_handle || '匿名ユーザー',
               reviewer_handle: reviewer?.twitter_handle || null,
@@ -300,15 +302,34 @@ export default function CreatorProfile() {
     return productSales.filter((item) => item.sales_count >= 1)
   }, [productSales])
 
-  const averageRating = useMemo(() => {
-    const validRatings = receivedReviews
+  const creatorReviews = useMemo(() => {
+    return receivedReviews.filter(
+      (review) => review.review_type === 'creator_review' || review.review_type === null
+    )
+  }, [receivedReviews])
+
+  const clientReviews = useMemo(() => {
+    return receivedReviews.filter((review) => review.review_type === 'client_review')
+  }, [receivedReviews])
+
+  const getAverageRating = (reviews: CreatorReview[]) => {
+    const validRatings = reviews
       .map((r) => Number(r.rating || 0))
       .filter((r) => Number.isFinite(r) && r > 0)
     if (validRatings.length === 0) return 0
     return validRatings.reduce((s, r) => s + r, 0) / validRatings.length
-  }, [receivedReviews])
+  }
 
-  const roundedAverageRating = averageRating > 0 ? averageRating.toFixed(1) : '-'
+  const creatorAverageRating = getAverageRating(creatorReviews)
+  const clientAverageRating = getAverageRating(clientReviews)
+  const roundedCreatorAverageRating = creatorAverageRating > 0 ? creatorAverageRating.toFixed(1) : '-'
+  const roundedClientAverageRating = clientAverageRating > 0 ? clientAverageRating.toFixed(1) : '-'
+  const totalReviewCount = creatorReviews.length + clientReviews.length
+  const isReferenceScore = totalReviewCount >= 3 && totalReviewCount < 10
+  const shouldShowRatings = totalReviewCount >= 3
+  const shouldShowTrustScore = totalReviewCount >= 5 && creator?.trust_score !== null && creator?.trust_score !== undefined
+  const trustScore = Number(creator?.trust_score || 0)
+  const trustGrade = trustScore >= 90 ? 'A' : trustScore >= 75 ? 'B' : trustScore >= 60 ? 'C' : 'D'
 
   const renderStars = (ratingValue: number) => {
     const rounded = Math.round(ratingValue)
@@ -400,6 +421,18 @@ export default function CreatorProfile() {
                 <div>
                   <h1 className="text-4xl font-bold">{creatorName}</h1>
                   <p className="text-xl opacity-90">@{creator.twitter_handle || 'no handle'}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {creator.rank === 'standard' && (
+                      <span className="inline-flex px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-sm font-bold">
+                        スタンダード
+                      </span>
+                    )}
+                    {creator.rank === 'prime' && (
+                      <span className="inline-flex px-3 py-1 rounded-full bg-yellow-100 text-yellow-800 text-sm font-bold">
+                        プライム認定
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -410,7 +443,7 @@ export default function CreatorProfile() {
                 </div>
                 <div className="bg-white/15 border border-white/20 rounded-2xl px-5 py-4 backdrop-blur-sm">
                   <p className="text-xs opacity-80 mb-1">平均評価</p>
-                  <p className="text-2xl font-bold">{roundedAverageRating}</p>
+                  <p className="text-2xl font-bold">{shouldShowRatings ? roundedCreatorAverageRating : '準備中'}</p>
                 </div>
               </div>
             </div>
@@ -567,56 +600,145 @@ export default function CreatorProfile() {
             <div className="border-t pt-12 mt-12">
               <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
                 <div>
-                  <h2 className="text-2xl font-bold">受け取ったレビュー</h2>
-                  <p className="text-sm text-gray-500 mt-2">依頼者・取引相手から届いた評価です</p>
+                  <h2 className="text-2xl font-bold">評価・信用スコア</h2>
+                  <p className="text-sm text-gray-500 mt-2">
+                    受注者としての評価と、依頼者としての評価を分けて表示します
+                  </p>
                 </div>
-                <div className="bg-yellow-50 border border-yellow-100 rounded-2xl px-5 py-4 text-right">
-                  <p className="text-sm text-gray-500 mb-1">平均評価</p>
-                  <div className="flex items-center justify-end gap-3">
-                    <span className="text-xl">{averageRating > 0 ? renderStars(averageRating) : '評価なし'}</span>
-                    <span className="text-2xl font-bold text-gray-900">{roundedAverageRating}</span>
+
+                {shouldShowTrustScore && (
+                  <div className="bg-gray-900 text-white rounded-2xl px-6 py-4 text-right shadow-sm">
+                    <p className="text-sm text-white/70 mb-1">総合信用スコア</p>
+                    <div className="flex items-end justify-end gap-3">
+                      <span className="text-4xl font-bold">{trustGrade}</span>
+                      <span className="text-sm text-white/70 pb-1">{Math.round(trustScore)} / 100</span>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">{receivedReviews.length}件のレビュー</p>
-                </div>
+                )}
               </div>
 
-              {receivedReviews.length === 0 ? (
+              {!shouldShowRatings ? (
                 <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-2xl">
-                  まだレビューはありません
+                  評価準備中
                   <br />
-                  取引完了後にレビューが届くとここに表示されます
+                  3件以上のレビューが蓄積されると評価スコアを表示します
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {receivedReviews.map((review) => (
-                    <div key={review.id} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-                      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
-                        <div>
-                          <div className="flex items-center gap-3 mb-2">
-                            <span className="text-xl">{renderStars(Number(review.rating || 0))}</span>
-                            <span className="font-bold text-gray-900">{review.rating || '-'} / 5</span>
-                          </div>
-                          <p className="text-sm text-gray-500">
-                            評価者：{review.reviewer_name}
-                            {review.reviewer_handle ? `（@${review.reviewer_handle}）` : ''}
-                          </p>
+                <div className="space-y-10">
+                  {isReferenceScore && (
+                    <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 text-sm text-amber-800">
+                      現在の評価は参考値です。10件以上のレビューが蓄積されると通常表示になります。
+                    </div>
+                  )}
+
+                  <section>
+                    <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-5">
+                      <div>
+                        <h3 className="text-xl font-bold">受注者としてのレビュー</h3>
+                        <p className="text-sm text-gray-500 mt-1">制作・納品を行った取引への評価です</p>
+                      </div>
+                      <div className="bg-yellow-50 border border-yellow-100 rounded-2xl px-5 py-4 text-right">
+                        <p className="text-sm text-gray-500 mb-1">受注者評価</p>
+                        <div className="flex items-center justify-end gap-3">
+                          <span className="text-xl">{creatorAverageRating > 0 ? renderStars(creatorAverageRating) : '評価なし'}</span>
+                          <span className="text-2xl font-bold text-gray-900">{roundedCreatorAverageRating}</span>
                         </div>
-                        <p className="text-xs text-gray-500">
-                          {review.created_at ? new Date(review.created_at).toLocaleString('ja-JP') : ''}
+                        <p className="text-xs text-gray-500 mt-1">
+                          {creatorReviews.length}件{isReferenceScore ? '・参考値' : ''}
                         </p>
                       </div>
-                      {review.step_title && (
-                        <div className="mb-4 inline-flex px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-sm border border-blue-100">
-                          工程{review.step_number || ''}：{review.step_title}
-                        </div>
-                      )}
-                      {review.comment ? (
-                        <p className="text-gray-700 leading-7 whitespace-pre-wrap">{review.comment}</p>
-                      ) : (
-                        <p className="text-gray-400 text-sm">コメントはありません</p>
-                      )}
                     </div>
-                  ))}
+
+                    {creatorReviews.length === 0 ? (
+                      <div className="text-center py-10 text-gray-500 bg-gray-50 rounded-2xl">
+                        まだ受注者としてのレビューはありません
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {creatorReviews.map((review) => (
+                          <div key={review.id} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+                            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+                              <div>
+                                <div className="flex items-center gap-3 mb-2">
+                                  <span className="text-xl">{renderStars(Number(review.rating || 0))}</span>
+                                  <span className="font-bold text-gray-900">{review.rating || '-'} / 5</span>
+                                </div>
+                                <p className="text-sm text-gray-500">
+                                  評価者：{review.reviewer_name}
+                                  {review.reviewer_handle ? `（@${review.reviewer_handle}）` : ''}
+                                </p>
+                              </div>
+                              <p className="text-xs text-gray-500">
+                                {review.created_at ? new Date(review.created_at).toLocaleString('ja-JP') : ''}
+                              </p>
+                            </div>
+                            {review.step_title && (
+                              <div className="mb-4 inline-flex px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-sm border border-blue-100">
+                                工程{review.step_number || ''}：{review.step_title}
+                              </div>
+                            )}
+                            {review.comment ? (
+                              <p className="text-gray-700 leading-7 whitespace-pre-wrap">{review.comment}</p>
+                            ) : (
+                              <p className="text-gray-400 text-sm">コメントはありません</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
+                  <section>
+                    <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-5">
+                      <div>
+                        <h3 className="text-xl font-bold">依頼者としてのレビュー</h3>
+                        <p className="text-sm text-gray-500 mt-1">発注・検収を行った取引への評価です</p>
+                      </div>
+                      <div className="bg-blue-50 border border-blue-100 rounded-2xl px-5 py-4 text-right">
+                        <p className="text-sm text-gray-500 mb-1">依頼者評価</p>
+                        <div className="flex items-center justify-end gap-3">
+                          <span className="text-xl">{clientAverageRating > 0 ? renderStars(clientAverageRating) : '評価なし'}</span>
+                          <span className="text-2xl font-bold text-gray-900">{roundedClientAverageRating}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {clientReviews.length}件{isReferenceScore ? '・参考値' : ''}
+                        </p>
+                      </div>
+                    </div>
+
+                    {clientReviews.length === 0 ? (
+                      <div className="text-center py-10 text-gray-500 bg-gray-50 rounded-2xl">
+                        まだ依頼者としてのレビューはありません
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {clientReviews.map((review) => (
+                          <div key={review.id} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+                            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+                              <div>
+                                <div className="flex items-center gap-3 mb-2">
+                                  <span className="text-xl">{renderStars(Number(review.rating || 0))}</span>
+                                  <span className="font-bold text-gray-900">{review.rating || '-'} / 5</span>
+                                </div>
+                                <p className="text-sm text-gray-500">
+                                  評価者：{review.reviewer_name}
+                                  {review.reviewer_handle ? `（@${review.reviewer_handle}）` : ''}
+                                </p>
+                              </div>
+                              <p className="text-xs text-gray-500">
+                                {review.created_at ? new Date(review.created_at).toLocaleString('ja-JP') : ''}
+                              </p>
+                            </div>
+                            {review.comment ? (
+                              <p className="text-gray-700 leading-7 whitespace-pre-wrap">{review.comment}</p>
+                            ) : (
+                              <p className="text-gray-400 text-sm">コメントはありません</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
                 </div>
               )}
             </div>
