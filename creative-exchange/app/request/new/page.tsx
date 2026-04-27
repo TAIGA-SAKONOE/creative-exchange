@@ -3,6 +3,7 @@
 import { createClient } from '../../../lib/supabase/client'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import LoadingState from '../../components/LoadingState'
 
 type MarketStatRow = {
   median_price: number | null
@@ -84,7 +85,7 @@ const groupCategoriesByParent = (categories: CategoryOption[]): CategoryGroup[] 
 
 export default function NewRequest() {
   return (
-    <Suspense fallback={<div className="p-12 text-center">読み込み中...</div>}>
+    <Suspense fallback={<LoadingState message="依頼作成画面を読み込み中..." />}>
       <NewRequestContent />
     </Suspense>
   )
@@ -638,54 +639,92 @@ function NewRequestContent() {
     }
   }
 
-  if (loading) return <div className="p-12 text-center">読み込み中...</div>
+  if (loading) return <LoadingState message="依頼作成画面を読み込み中..." />
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="max-w-3xl mx-auto px-4">
+    <div className="min-h-screen bg-gray-50 py-8 md:py-12">
+      <div className="max-w-5xl mx-auto px-4">
         <button
           onClick={() => router.push('/mypage')}
-          className="mb-6 text-gray-500 hover:text-gray-700 flex items-center gap-2"
+          className="mb-6 inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition"
         >
           ← マイページに戻る
         </button>
 
-        <div className="bg-white rounded-3xl shadow-xl p-8">
+        <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-5 md:p-8">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold mb-3">新しい依頼を作成</h1>
-            <p className="text-gray-500">
-              かんたん依頼・通常依頼・工程管理依頼・コンペ依頼を作成できます。
+            <p className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold mb-4">
+              New Request
             </p>
+
+            <h1 className="text-3xl md:text-4xl font-bold mb-3">
+              新しい依頼を作成
+            </h1>
+
+            <p className="text-gray-600 leading-7 max-w-3xl">
+              依頼形式を選び、制作内容・予算・納期を入力します。
+              迷ったら「通常依頼」または「かんたん依頼」から始めてください。
+            </p>
+
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="rounded-2xl bg-blue-50 border border-blue-100 p-4">
+                <p className="text-sm font-bold text-blue-900 mb-1">1. 形式を選ぶ</p>
+                <p className="text-xs text-blue-700 leading-5">
+                  軽い依頼、通常依頼、分業依頼、コンペから選択します。
+                </p>
+              </div>
+              <div className="rounded-2xl bg-purple-50 border border-purple-100 p-4">
+                <p className="text-sm font-bold text-purple-900 mb-1">2. 内容を書く</p>
+                <p className="text-xs text-purple-700 leading-5">
+                  目的、完成イメージ、参考資料、希望納期を整理します。
+                </p>
+              </div>
+              <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
+                <p className="text-sm font-bold text-emerald-900 mb-1">3. 公開する</p>
+                <p className="text-xs text-emerald-700 leading-5">
+                  公開依頼または指名依頼として保存します。
+                </p>
+              </div>
+            </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-10">
+          <form onSubmit={handleSubmit} className="space-y-8 md:space-y-10">
             <div className="space-y-6">
-              <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm">
-                <label className="block text-sm font-medium text-gray-700 mb-4">
-                  依頼形式
-                </label>
+              <div className="bg-white border border-blue-100 rounded-3xl p-5 md:p-6 shadow-sm">
+                <div className="mb-5">
+                  <p className="text-sm font-bold text-blue-600 mb-2">
+                    Step 1
+                  </p>
+                  <h2 className="text-xl md:text-2xl font-bold text-gray-900">
+                    依頼形式を選ぶ
+                  </h2>
+                  <p className="text-sm text-gray-500 leading-6 mt-2">
+                    初期βでは「かんたん依頼」か「通常依頼」が最も扱いやすいです。
+                    分業制作は「工程管理依頼」を選んでください。
+                  </p>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {[
                     {
                       value: 'simple' as OrderType,
                       title: 'かんたん依頼',
-                      description: '3ステップ・やり取り少なめ・修正なし前提。まず軽く依頼したい方向けです。',
+                      description: '修正なし前提・単一工程のライトな依頼です。初めて使う場合はここからが安全です。',
                     },
                     {
                       value: 'standard' as OrderType,
                       title: '通常依頼',
-                      description: '単一工程で、内容・予算・納期を指定して公開または指名します。',
+                      description: '単一工程で、内容・予算・納期を指定します。最も標準的な依頼形式です。',
                     },
                     {
                       value: 'multi_step' as OrderType,
                       title: '工程管理依頼',
-                      description: '作詞・イラスト・動画など複数工程を分けて募集・管理します。',
+                      description: '作詞・イラスト・動画などを工程ごとに分けて募集・管理します。MV制作向きです。',
                     },
                     {
                       value: 'competition' as OrderType,
                       title: 'コンペ依頼',
-                      description: '提案を集めてから採用する形式です。詳細機能は次フェーズで拡張します。',
+                      description: '複数の提案を集めてから採用する形式です。βでは簡易版として扱います。',
                     },
                   ].map((option) => (
                     <button
@@ -732,10 +771,18 @@ function NewRequestContent() {
                 )}
               </div>
 
-              <div className="bg-gray-50 border border-gray-200 rounded-3xl p-6">
-                <label className="block text-sm font-medium text-gray-700 mb-4">
-                  公開 / 指名
-                </label>
+              <div className="bg-gray-50 border border-gray-200 rounded-3xl p-5 md:p-6">
+                <div className="mb-5">
+                  <p className="text-sm font-bold text-blue-600 mb-2">
+                    Step 2
+                  </p>
+                  <h2 className="text-xl md:text-2xl font-bold text-gray-900">
+                    募集方法を選ぶ
+                  </h2>
+                  <p className="text-sm text-gray-500 leading-6 mt-2">
+                    迷ったら「公開依頼」。すでに頼みたい相手が決まっている場合は「指名依頼」です。
+                  </p>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <button
@@ -809,8 +856,20 @@ function NewRequestContent() {
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+              <div className="rounded-3xl border border-gray-200 bg-white p-5 md:p-6">
+                <div className="mb-5">
+                  <p className="text-sm font-bold text-blue-600 mb-2">
+                    Step 3
+                  </p>
+                  <h2 className="text-xl md:text-2xl font-bold text-gray-900">
+                    依頼内容を書く
+                  </h2>
+                  <p className="text-sm text-gray-500 leading-6 mt-2">
+                    タイトルは短く、内容は「何を・いつまでに・どんな雰囲気で」を書くと伝わりやすいです。
+                  </p>
+                </div>
+
+                <label className="block text-sm font-bold text-gray-700 mb-2">
                   依頼タイトル
                 </label>
                 <input
@@ -824,13 +883,13 @@ function NewRequestContent() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-bold text-gray-700 mb-2">
                   依頼全体の説明
                 </label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="依頼全体の目的、雰囲気、参考URL、完成イメージなどを書いてください"
+                  placeholder="例：新曲MV用の一枚絵をお願いしたいです。夜の街、青系、少し寂しい雰囲気。参考URL：..."
                   className="w-full h-40 p-4 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-200 resize-y"
                   required
                 />
@@ -840,9 +899,12 @@ function NewRequestContent() {
             <div className="border-t pt-8">
               <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold">工程</h2>
-                  <p className="text-sm text-gray-500 mt-2">
-                    かんたん依頼・通常依頼・コンペ依頼は単一工程、工程管理依頼は複数工程で作成できます。
+                  <p className="text-sm font-bold text-blue-600 mb-2">
+                    Step 4
+                  </p>
+                  <h2 className="text-2xl font-bold">工程を設定する</h2>
+                  <p className="text-sm text-gray-500 mt-2 leading-6">
+                    単発依頼は1工程で十分です。MV制作のようにイラスト・動画・MIXを分ける場合だけ工程を追加します。
                   </p>
                 </div>
 
@@ -865,7 +927,7 @@ function NewRequestContent() {
                 {steps.map((step, index) => (
                   <div
                     key={index}
-                    className="border border-gray-200 rounded-3xl p-6 bg-gray-50"
+                    className="border border-gray-200 rounded-3xl p-5 md:p-6 bg-gray-50"
                   >
                     <div className="flex items-start justify-between gap-4 mb-5">
                       <div>
@@ -890,7 +952,7 @@ function NewRequestContent() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
                           工程タイトル
                         </label>
                         <input
@@ -906,7 +968,7 @@ function NewRequestContent() {
                       </div>
 
                       <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
                           工程説明
                         </label>
                         <textarea
@@ -921,7 +983,7 @@ function NewRequestContent() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
                           必要カテゴリ
                         </label>
                         <select
@@ -949,7 +1011,7 @@ function NewRequestContent() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
                           工程予算
                         </label>
                         <input
@@ -962,10 +1024,13 @@ function NewRequestContent() {
                           placeholder="例：15000"
                           className="w-full p-4 border border-gray-300 rounded-2xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
                         />
+                        <p className="mt-2 text-xs text-gray-500 leading-5">
+                          未定の場合は空欄でも作成できます。相場がある品目は下に参考値が出ます。
+                        </p>
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
                           工程納期
                         </label>
                         <input
@@ -980,7 +1045,7 @@ function NewRequestContent() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
                           並行グループ
                         </label>
                         <select
@@ -1004,7 +1069,7 @@ function NewRequestContent() {
 
                       {isNamedRequest && (
                         <div className="md:col-span-2 relative">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                          <label className="block text-sm font-bold text-gray-700 mb-2">
                             指名するクリエイター
                           </label>
 
@@ -1104,7 +1169,7 @@ function NewRequestContent() {
                             </p>
 
                             {stats.transaction_count >= 5 ? (
-                              <div className="grid grid-cols-3 gap-4 text-center">
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
                                 <div>
                                   <p className="text-xs text-gray-500">取引件数</p>
                                   <p className="text-lg font-semibold">
@@ -1152,7 +1217,10 @@ function NewRequestContent() {
             </div>
 
             <div className="border-t pt-8">
-              <div className="bg-gray-50 border border-gray-200 rounded-3xl p-6">
+              <div className="bg-gray-50 border border-gray-200 rounded-3xl p-5 md:p-6">
+                <p className="text-sm font-bold text-blue-600 mb-2">
+                  Step 5
+                </p>
                 <h2 className="text-xl font-bold mb-4">作成内容の確認</h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
@@ -1224,10 +1292,15 @@ function NewRequestContent() {
               </div>
             </div>
 
+            <div className="rounded-2xl border border-yellow-100 bg-yellow-50 p-4 text-sm text-yellow-800 leading-7">
+              現在、決済・仮払い機能はβ提供準備中です。
+              この画面では依頼情報を作成し、決済導線はStripe審査通過後に接続します。
+            </div>
+
             <button
               type="submit"
               disabled={submitting}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-5 rounded-2xl font-medium text-lg shadow-sm"
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-5 rounded-2xl font-bold text-lg shadow-sm transition"
             >
               {submitting
                 ? '依頼を作成中...'
