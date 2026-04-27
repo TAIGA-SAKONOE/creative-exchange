@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import ProductMarketStatsCard from '../components/ProductMarketStatsCard'
+import LoadingState from '../components/LoadingState'
+import EmptyState from '../components/EmptyState'
 
 type Category = {
   id: number
@@ -321,20 +323,17 @@ export default function ListingPage() {
         </div>
 
         {loading ? (
-          <div className="text-center py-12">読み込み中...</div>
+          <LoadingState message="作品マーケットを読み込み中..." />
         ) : filteredListings.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-gray-500 text-lg mb-4">条件に合う作品がありません</p>
-
-            {profile && (
-              <button
-                onClick={() => router.push('/listing/new')}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium"
-              >
-                最初の作品を出品する
-              </button>
-            )}
-          </div>
+          <EmptyState
+            icon="🎨"
+            title="条件に合う作品がありません"
+            message="検索条件をゆるめるか、カテゴリを変更すると見つかる場合があります。出品できる作品があれば、最初の作品を登録して市場を作りましょう。"
+            actionLabel={profile ? '最初の作品を出品する' : undefined}
+            actionHref={profile ? '/listing/new' : undefined}
+            secondaryLabel="条件を変えて探す"
+            secondaryHref="/listing"
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredListings.map((item) => {
@@ -353,7 +352,10 @@ export default function ListingPage() {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="text-gray-400 text-4xl">🎨</div>
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 text-gray-400">
+                          <div className="text-4xl mb-2">🎨</div>
+                          <div className="text-xs font-bold">No Image</div>
+                        </div>
                       )}
                     </div>
 
