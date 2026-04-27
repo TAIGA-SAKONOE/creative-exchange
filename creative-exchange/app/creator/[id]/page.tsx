@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import LoadingState from '../../components/LoadingState'
 import MessageState from '../../components/MessageState'
+import EmptyState from '../../components/EmptyState'
 import Link from 'next/link'
 
 type ProductSalesSummary = {
@@ -544,11 +545,11 @@ export default function CreatorProfile() {
               </div>
 
               {visiblePrices.length === 0 ? (
-                <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-2xl">
-                  まだ十分な受託取引実績がありません
-                  <br />
-                  3件以上の取引が蓄積されるとここに価格帯が表示されます
-                </div>
+                <EmptyState
+                  icon="📊"
+                  title="まだ十分な受託取引実績がありません"
+                  message="3件以上の取引が蓄積されると、カテゴリ別の価格帯が表示されます。初期βでは参考実績が増え次第、順次反映されます。"
+                />
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {visiblePrices.map((item: any) => (
@@ -579,11 +580,11 @@ export default function CreatorProfile() {
               </div>
 
               {visibleProductSales.length === 0 ? (
-                <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-2xl">
-                  まだ既製品の販売実績がありません
-                  <br />
-                  作品マーケットで販売が成立すると、ここに価格実績が表示されます
-                </div>
+                <EmptyState
+                  icon="🛍️"
+                  title="まだ既製品の販売実績がありません"
+                  message="作品マーケットで販売が成立すると、販売価格の実績がここに表示されます。"
+                />
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {visibleProductSales.map((item) => (
@@ -660,9 +661,11 @@ export default function CreatorProfile() {
                     </div>
 
                     {creatorReviews.length === 0 ? (
-                      <div className="text-center py-10 text-gray-500 bg-gray-50 rounded-2xl">
-                        まだ受注者としてのレビューはありません
-                      </div>
+                      <EmptyState
+                        icon="⭐"
+                        title="まだ受注者としてのレビューはありません"
+                        message="制作・納品を行った取引のレビューが蓄積されると、受注者としての評価が表示されます。"
+                      />
                     ) : (
                       <div className="space-y-4">
                         {creatorReviews.map((review) => (
@@ -717,9 +720,11 @@ export default function CreatorProfile() {
                     </div>
 
                     {clientReviews.length === 0 ? (
-                      <div className="text-center py-10 text-gray-500 bg-gray-50 rounded-2xl">
-                        まだ依頼者としてのレビューはありません
-                      </div>
+                      <EmptyState
+                        icon="🤝"
+                        title="まだ依頼者としてのレビューはありません"
+                        message="依頼・検収を行った取引のレビューが蓄積されると、依頼者としての評価が表示されます。"
+                      />
                     ) : (
                       <div className="space-y-4">
                         {clientReviews.map((review) => (
