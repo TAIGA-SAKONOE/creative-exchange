@@ -170,6 +170,72 @@ export default function HomePage() {
       </section>
 
       <section className="max-w-6xl mx-auto px-4 py-16 md:py-20">
+        <div className="bg-white border border-blue-100 rounded-3xl shadow-sm p-8 md:p-12">
+          <div className="text-center mb-10">
+            <p className="text-sm font-bold text-blue-600 mb-3">
+              Payment Beta
+            </p>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              制作料金を支払い、納品・検収まで管理する。
+            </h2>
+            <p className="text-gray-600 leading-8 max-w-3xl mx-auto">
+              Creative Exchangeは、イラスト・音楽・動画・文章などの制作依頼について、
+              依頼者が制作料金を支払い、クリエイターが納品・検収後に報酬を受け取る
+              取引フローを整備しています。
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+            <div className="rounded-2xl bg-blue-50 border border-blue-100 p-6">
+              <div className="text-2xl mb-3">💳</div>
+              <h3 className="font-bold text-gray-900 mb-2">
+                支払い対象
+              </h3>
+              <p className="text-sm text-gray-600 leading-7">
+                制作料金の対象は、イラスト、動画、音楽、MIX、ロゴ、文章などの
+                クリエイティブ制作取引です。
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-purple-50 border border-purple-100 p-6">
+              <div className="text-2xl mb-3">✅</div>
+              <h3 className="font-bold text-gray-900 mb-2">
+                納品・検収
+              </h3>
+              <p className="text-sm text-gray-600 leading-7">
+                依頼、受注、納品、検収、レビューまでを記録し、
+                曖昧なDM取引ではなく、取引履歴として残します。
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-6">
+              <div className="text-2xl mb-3">🧾</div>
+              <h3 className="font-bold text-gray-900 mb-2">
+                手数料
+              </h3>
+              <p className="text-sm text-gray-600 leading-7">
+                取引金額に対して原則10%のサービス手数料を設定する方針です。
+                正式条件はβ提供開始時に表示します。
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-100 rounded-2xl p-5 text-sm text-yellow-800 leading-7">
+            現在、決済・仮払い機能はβ提供準備中です。
+            詳細は
+            <Link href="/payment-guide" className="font-bold underline mx-1">
+              決済・仮払いについて
+            </Link>
+            、
+            <Link href="/refund-policy" className="font-bold underline mx-1">
+              キャンセル・返金ポリシー
+            </Link>
+            をご確認ください。
+          </div>
+        </div>
+      </section>
+
+      <section className="max-w-6xl mx-auto px-4 py-16 md:py-20">
         <div className="text-center mb-12">
           <p className="text-sm font-bold text-blue-600 mb-3">
             Start Routes
