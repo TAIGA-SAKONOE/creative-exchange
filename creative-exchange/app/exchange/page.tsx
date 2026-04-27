@@ -155,7 +155,7 @@ export default function ExchangePage() {
       fallback={
         <div className="min-h-screen bg-gray-50 py-12">
           <div className="max-w-6xl mx-auto px-4">
-            <div className="bg-white rounded-3xl shadow-xl p-10 text-center text-gray-600">
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-10 text-center text-gray-600">
               Exchangeを読み込み中...
             </div>
           </div>
@@ -1344,7 +1344,7 @@ function ExchangePageContent() {
     return (
       <div className="min-h-screen bg-gray-50 py-12">
         <div className="max-w-6xl mx-auto px-4">
-          <div className="bg-white rounded-3xl shadow-xl p-10 text-center text-gray-600">
+          <div className="bg-white rounded-3xl shadow-sm p-10 text-center text-gray-600">
             Exchangeを読み込み中...
           </div>
         </div>
@@ -1356,7 +1356,7 @@ function ExchangePageContent() {
     return (
       <div className="min-h-screen bg-gray-50 py-12">
         <div className="max-w-6xl mx-auto px-4">
-          <div className="bg-white rounded-3xl shadow-xl p-10">
+          <div className="bg-white rounded-3xl shadow-sm p-10">
             <h1 className="text-2xl font-bold text-red-600 mb-4">表示できません</h1>
             <p className="text-gray-700">{error}</p>
           </div>
@@ -1366,82 +1366,127 @@ function ExchangePageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
+    <div className="min-h-screen bg-gray-50 py-8 md:py-12">
       <div className="max-w-6xl mx-auto px-4">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-medium mb-4">
-              <span>Exchange</span>
+        <div className="rounded-3xl bg-white border border-gray-100 shadow-sm p-6 md:p-8 mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-bold mb-4">
+                <span>Exchange</span>
+              </div>
+              <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-gray-900">
+                依頼・クリエイター・作品を探す
+              </h1>
+              <p className="mt-3 text-gray-600 text-base md:text-lg leading-8 max-w-3xl">
+                公開依頼、募集中工程、受付中クリエイター、作品マーケットをまとめて確認できます。
+                まずは依頼を探すか、頼みたい相手を探してください。
+              </p>
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tight">案件を探す</h1>
-            <p className="mt-3 text-gray-600 text-lg">
-              公開依頼・募集中工程・クリエイター・既製品を横断して探せます
-            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Link
+                href="/request/new"
+                className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-2xl font-bold shadow-sm transition"
+              >
+                新しい依頼を作成
+              </Link>
+
+              <Link
+                href="/mypage"
+                className="inline-flex items-center justify-center bg-white border border-gray-200 hover:bg-gray-50 px-5 py-3 rounded-2xl font-bold text-gray-700 transition"
+              >
+                マイページへ戻る
+              </Link>
+            </div>
           </div>
 
-          <Link
-            href="/mypage"
-            className="inline-flex items-center justify-center bg-white border border-gray-200 hover:bg-gray-50 px-6 py-3 rounded-2xl font-medium shadow-sm transition"
-          >
-            マイページへ戻る
-          </Link>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-8">
+            <div className="rounded-2xl bg-blue-50 border border-blue-100 p-4">
+              <p className="text-sm font-bold text-blue-900">依頼一覧</p>
+              <p className="text-xs text-blue-700 leading-5 mt-1">
+                募集中の制作案件・工程を探す
+              </p>
+            </div>
+            <div className="rounded-2xl bg-purple-50 border border-purple-100 p-4">
+              <p className="text-sm font-bold text-purple-900">クリエイター一覧</p>
+              <p className="text-xs text-purple-700 leading-5 mt-1">
+                受付中の依頼先候補を探す
+              </p>
+            </div>
+            <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
+              <p className="text-sm font-bold text-emerald-900">作品マーケット</p>
+              <p className="text-xs text-emerald-700 leading-5 mt-1">
+                完成済み作品を探す
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-xl p-3 mb-8">
-          <div className="flex gap-2 flex-wrap">
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-2 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <button
               onClick={() => setActiveTab('requests')}
-              className={`px-5 py-3 rounded-2xl font-medium transition ${
+              className={`px-5 py-4 rounded-2xl font-bold transition text-left ${
                 activeTab === 'requests'
                   ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
               }`}
             >
-              依頼一覧
+              <span className="block">依頼一覧</span>
+              <span className={`block text-xs mt-1 ${activeTab === 'requests' ? 'text-blue-100' : 'text-gray-500'}`}>
+                {totalRequestListings}件
+              </span>
             </button>
 
             <button
               onClick={() => setActiveTab('creators')}
-              className={`px-5 py-3 rounded-2xl font-medium transition ${
+              className={`px-5 py-4 rounded-2xl font-bold transition text-left ${
                 activeTab === 'creators'
                   ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
               }`}
             >
-              クリエイター一覧
+              <span className="block">クリエイター一覧</span>
+              <span className={`block text-xs mt-1 ${activeTab === 'creators' ? 'text-blue-100' : 'text-gray-500'}`}>
+                {filteredCreators.length}人
+              </span>
             </button>
 
             <button
               onClick={() => setActiveTab('listings')}
-              className={`px-5 py-3 rounded-2xl font-medium transition ${
+              className={`px-5 py-4 rounded-2xl font-bold transition text-left ${
                 activeTab === 'listings'
                   ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
               }`}
             >
-              作品マーケット
+              <span className="block">作品マーケット</span>
+              <span className={`block text-xs mt-1 ${activeTab === 'listings' ? 'text-blue-100' : 'text-gray-500'}`}>
+                {filteredListings.length}件
+              </span>
             </button>
           </div>
         </div>
 
         {activeTab === 'requests' ? (
           <>
-            <div className="bg-white rounded-3xl shadow-xl p-8 mb-8">
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-5 md:p-8 mb-8">
               <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
                 <div>
+                  <p className="text-sm font-bold text-blue-600 mb-2">Search</p>
                   <h2 className="text-2xl font-bold">依頼・工程を検索</h2>
-                  <p className="text-sm text-gray-500 mt-2">
-                    募集中工程・公開依頼をカテゴリ・タイトル・説明文・予算から絞り込めます
+                  <p className="text-sm text-gray-500 mt-2 leading-6">
+                    募集中工程・公開依頼をカテゴリ・タイトル・説明文・予算から絞り込めます。
                   </p>
                 </div>
 
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-500">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <span className="inline-flex justify-center rounded-full bg-gray-100 px-4 py-2 text-sm font-bold text-gray-600">
                     表示中 {totalRequestListings} 件
                   </span>
                   <Link
                     href="/request/new"
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-2xl font-medium transition"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-2xl font-bold transition text-center"
                   >
                     新しい依頼を作成
                   </Link>
@@ -1450,7 +1495,7 @@ function ExchangePageContent() {
 
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-bold text-gray-600 mb-2">
                     カテゴリ
                   </label>
                   <select
@@ -1468,7 +1513,7 @@ function ExchangePageContent() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-bold text-gray-600 mb-2">
                     タイトル
                   </label>
                   <input
@@ -1481,7 +1526,7 @@ function ExchangePageContent() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-bold text-gray-600 mb-2">
                     説明文
                   </label>
                   <input
@@ -1494,7 +1539,7 @@ function ExchangePageContent() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-bold text-gray-600 mb-2">
                     最低金額
                   </label>
                   <input
@@ -1508,7 +1553,7 @@ function ExchangePageContent() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-bold text-gray-600 mb-2">
                     最高金額
                   </label>
                   <input
@@ -1548,7 +1593,7 @@ function ExchangePageContent() {
                   return (
                     <div
                       key={step.id}
-                      className="bg-white rounded-3xl shadow-xl p-8 border border-blue-100 hover:shadow-2xl transition-shadow"
+                      className="bg-white rounded-3xl shadow-sm p-5 md:p-8 border border-blue-100 hover:shadow-xl transition-shadow"
                     >
                       <div className="flex flex-col xl:flex-row xl:items-stretch gap-8">
                         <div className="flex-1 min-w-0">
@@ -1662,7 +1707,7 @@ function ExchangePageContent() {
                   return (
                     <div
                       key={order.id}
-                      className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 hover:shadow-2xl transition-shadow"
+                      className="bg-white rounded-3xl shadow-sm p-5 md:p-8 border border-gray-100 hover:shadow-xl transition-shadow"
                     >
                       <div className="flex flex-col xl:flex-row xl:items-stretch gap-8">
                         <div className="flex-1 min-w-0">
@@ -1749,7 +1794,7 @@ function ExchangePageContent() {
         ) : activeTab === 'creators' ? (
           <>
             {currentUser && (
-              <div className="bg-white rounded-3xl shadow-xl p-8 mb-8 border border-blue-100">
+              <div className="bg-white rounded-3xl shadow-sm p-8 mb-8 border border-blue-100">
                 <div className="flex flex-col xl:flex-row xl:items-stretch gap-8">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-4 mb-6">
@@ -1862,22 +1907,23 @@ function ExchangePageContent() {
               </div>
             )}
 
-            <div className="bg-white rounded-3xl shadow-xl p-8 mb-8">
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-5 md:p-8 mb-8">
               <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
                 <div>
+                  <p className="text-sm font-bold text-blue-600 mb-2">Search</p>
                   <h2 className="text-2xl font-bold">クリエイターを検索</h2>
-                  <p className="text-sm text-gray-500 mt-2">
-                    品目・スキルサブカテゴリ・表示名・自己紹介から探せます
+                  <p className="text-sm text-gray-500 mt-2 leading-6">
+                    品目・スキルサブカテゴリ・表示名・自己紹介から探せます。
                   </p>
                 </div>
-                <div className="text-sm text-gray-500">
+                <div className="inline-flex justify-center rounded-full bg-gray-100 px-4 py-2 text-sm font-bold text-gray-600">
                   表示中 {filteredCreators.length} 人
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-8 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-bold text-gray-600 mb-2">
                     納品できる品目
                   </label>
                   <select
@@ -1899,7 +1945,7 @@ function ExchangePageContent() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-bold text-gray-600 mb-2">
                     大カテゴリ
                   </label>
                   <select
@@ -1921,7 +1967,7 @@ function ExchangePageContent() {
                 </div>
 
                 <div className="relative" ref={creatorSkillTagSearchRef}>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-bold text-gray-600 mb-2">
                     サブカテゴリ
                   </label>
 
@@ -1951,7 +1997,7 @@ function ExchangePageContent() {
                   )}
 
                   {creatorSkillTagDropdownOpen && (
-                    <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 max-h-72 overflow-y-auto p-2">
+                    <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-200 rounded-2xl shadow-sm z-50 max-h-72 overflow-y-auto p-2">
                       {filteredSkillTagSuggestions.length > 0 ? (
                         filteredSkillTagSuggestions.map((tag) => (
                           <button
@@ -1979,7 +2025,7 @@ function ExchangePageContent() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-bold text-gray-600 mb-2">
                     表示名
                   </label>
                   <input
@@ -1992,7 +2038,7 @@ function ExchangePageContent() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-bold text-gray-600 mb-2">
                     自己紹介
                   </label>
                   <input
@@ -2005,7 +2051,7 @@ function ExchangePageContent() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-bold text-gray-600 mb-2">
                     補足スキル
                   </label>
                   <input
@@ -2018,7 +2064,7 @@ function ExchangePageContent() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-bold text-gray-600 mb-2">
                     受付状況
                   </label>
                   <button
@@ -2035,7 +2081,7 @@ function ExchangePageContent() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-bold text-gray-600 mb-2">
                     ランク
                   </label>
                   <button
@@ -2054,7 +2100,7 @@ function ExchangePageContent() {
             </div>
 
             {filteredCreators.length === 0 ? (
-              <div className="bg-white rounded-3xl shadow-xl p-14 text-center">
+              <div className="bg-white rounded-3xl shadow-sm p-14 text-center">
                 <div className="text-5xl mb-4">🎨</div>
                 <h3 className="text-xl font-bold mb-2">条件に合うクリエイターがいません</h3>
                 <p className="text-gray-500">
@@ -2071,7 +2117,7 @@ function ExchangePageContent() {
                   return (
                     <div
                       key={creator.id}
-                      className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 hover:shadow-2xl transition-shadow"
+                      className="bg-white rounded-3xl shadow-sm p-5 md:p-8 border border-gray-100 hover:shadow-xl transition-shadow"
                     >
                       <div className="flex flex-col xl:flex-row xl:items-stretch gap-8">
                         <div className="flex-1 min-w-0">
@@ -2233,7 +2279,7 @@ function ExchangePageContent() {
               loading={listingMarketStatsLoading}
             />
 
-            <div className="bg-white rounded-3xl shadow-xl p-8 mb-8">
+            <div className="bg-white rounded-3xl shadow-sm p-8 mb-8">
               <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
                 <div>
                   <h2 className="text-2xl font-bold">作品を検索</h2>
@@ -2256,7 +2302,7 @@ function ExchangePageContent() {
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-bold text-gray-600 mb-2">
                     カテゴリ
                   </label>
                   <select
@@ -2274,7 +2320,7 @@ function ExchangePageContent() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-bold text-gray-600 mb-2">
                     タイトル
                   </label>
                   <input
@@ -2287,7 +2333,7 @@ function ExchangePageContent() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-bold text-gray-600 mb-2">
                     最低価格
                   </label>
                   <input
@@ -2301,7 +2347,7 @@ function ExchangePageContent() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-bold text-gray-600 mb-2">
                     最高価格
                   </label>
                   <input
@@ -2317,7 +2363,7 @@ function ExchangePageContent() {
             </div>
 
             {filteredListings.length === 0 ? (
-              <div className="bg-white rounded-3xl shadow-xl p-14 text-center">
+              <div className="bg-white rounded-3xl shadow-sm p-14 text-center">
                 <div className="text-5xl mb-4">🛍</div>
                 <h3 className="text-xl font-bold mb-2">条件に合う作品がありません</h3>
                 <p className="text-gray-500">
@@ -2334,7 +2380,7 @@ function ExchangePageContent() {
                   return (
                     <div
                       key={listing.id}
-                      className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden hover:shadow-2xl transition-shadow"
+                      className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl transition-shadow"
                     >
                       <Link href={`/listing/${listing.id}`} className="block">
                         <div className="w-full aspect-[4/3] bg-gray-100 overflow-hidden">
