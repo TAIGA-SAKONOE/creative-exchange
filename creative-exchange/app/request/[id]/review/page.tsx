@@ -63,6 +63,7 @@ function ReviewPageContent() {
   const [revieweeId, setRevieweeId] = useState<string | null>(null)
   const [revieweeName, setRevieweeName] = useState<string>('評価相手')
   const [role, setRole] = useState<string>('')
+  const [reviewType, setReviewType] = useState<'creator_review' | 'client_review'>('creator_review')
 
   const [rating, setRating] = useState(5)
   const [comment, setComment] = useState('')
@@ -172,6 +173,7 @@ function ReviewPageContent() {
           setRevieweeId(normalizedStep.creator_id)
           setRevieweeName(getStepCreatorName(normalizedStep))
           setRole('client_to_creator')
+          setReviewType('creator_review')
           setLoading(false)
           return
         }
@@ -180,6 +182,7 @@ function ReviewPageContent() {
           setRevieweeId(orderRow.client_id)
           setRevieweeName('依頼者')
           setRole('creator_to_client')
+          setReviewType('client_review')
           setLoading(false)
           return
         }
@@ -205,6 +208,7 @@ function ReviewPageContent() {
         setRevieweeId(orderRow.creator_id)
         setRevieweeName('クリエイター')
         setRole('client_to_creator')
+        setReviewType('creator_review')
         setLoading(false)
         return
       }
@@ -213,6 +217,7 @@ function ReviewPageContent() {
         setRevieweeId(orderRow.client_id)
         setRevieweeName('依頼者')
         setRole('creator_to_client')
+        setReviewType('client_review')
         setLoading(false)
         return
       }
@@ -287,12 +292,13 @@ function ReviewPageContent() {
         rating,
         comment: comment.trim() || null,
         role,
+        review_type: reviewType,
       }
 
       const { data: insertedReview, error: insertError } = await supabase
         .from('reviews')
         .insert(reviewPayload)
-        .select('id, order_id, order_step_id, reviewer_id, reviewee_id, rating, comment, role, created_at')
+        .select('id, order_id, order_step_id, reviewer_id, reviewee_id, rating, comment, role, review_type, created_at')
         .single()
 
       if (insertError) {
@@ -305,6 +311,14 @@ function ReviewPageContent() {
 
       if (stepId && insertedReview.order_step_id !== stepId) {
         throw new Error('レビューは保存されましたが、工程IDが正しく保存されませんでした')
+      }
+
+      const { error: rpcError } = await supabase.rpc('recalculate_user_rating', {
+        p_user_id: revieweeId,
+      })
+
+      if (rpcError) {
+        throw new Error(`信用スコアの再計算に失敗しました: ${rpcError.message}`)
       }
 
       const { error: notificationError } = await supabase.from('notifications').insert({
