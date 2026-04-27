@@ -68,6 +68,7 @@ type CreatorItem = {
   skills: string[] | string | null
   portfolio_urls: string[] | string | null
   is_accepting_orders?: boolean | null
+  rank?: 'growth' | 'standard' | 'prime' | null
 }
 
 type ListingItem = {
@@ -215,6 +216,7 @@ function ExchangePageContent() {
   const [creatorBioKeyword, setCreatorBioKeyword] = useState('')
   const [creatorSkillKeyword, setCreatorSkillKeyword] = useState('')
   const [creatorAcceptingOnly, setCreatorAcceptingOnly] = useState(false)
+  const [creatorPrimeOnly, setCreatorPrimeOnly] = useState(false)
 
   const [listingCategoryId, setListingCategoryId] = useState('')
   const [listingTitleKeyword, setListingTitleKeyword] = useState('')
@@ -396,7 +398,7 @@ function ExchangePageContent() {
 
       const { data: creatorRows, error: creatorsError } = await supabase
         .from('users')
-        .select('id, display_name, bio, twitter_handle, skills, portfolio_urls, is_accepting_orders')
+        .select('id, display_name, bio, twitter_handle, skills, portfolio_urls, is_accepting_orders, rank')
         .order('created_at', { ascending: false })
 
       if (creatorsError) {
@@ -675,6 +677,27 @@ function ExchangePageContent() {
     return {
       label: '通常依頼',
       className: 'bg-gray-100 text-gray-700 border border-gray-200',
+    }
+  }
+
+  const getCreatorRankChip = (rank?: 'growth' | 'standard' | 'prime' | null) => {
+    if (rank === 'prime') {
+      return {
+        label: 'プライム認定',
+        className: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+      }
+    }
+
+    if (rank === 'standard') {
+      return {
+        label: 'スタンダード',
+        className: 'bg-blue-100 text-blue-700 border border-blue-200',
+      }
+    }
+
+    return {
+      label: '成長中',
+      className: 'bg-gray-100 text-gray-600 border border-gray-200',
     }
   }
 
@@ -973,6 +996,9 @@ function ExchangePageContent() {
       const matchAccepting =
         !creatorAcceptingOnly || creator.is_accepting_orders !== false
 
+      const matchPrime =
+        !creatorPrimeOnly || creator.rank === 'prime'
+
       return (
         matchCategory &&
         matchParentCategory &&
@@ -980,7 +1006,8 @@ function ExchangePageContent() {
         matchName &&
         matchBio &&
         matchSkill &&
-        matchAccepting
+        matchAccepting &&
+        matchPrime
       )
     })
   }, [
@@ -991,6 +1018,8 @@ function ExchangePageContent() {
     creatorNameKeyword,
     creatorBioKeyword,
     creatorSkillKeyword,
+    creatorAcceptingOnly,
+    creatorPrimeOnly,
     creatorCategoryMap,
     creatorSkillTagMap,
   ])
@@ -1838,7 +1867,7 @@ function ExchangePageContent() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-8 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-2">
                     納品できる品目
@@ -1996,6 +2025,23 @@ function ExchangePageContent() {
                     {creatorAcceptingOnly ? '受付中のみ ✓' : 'すべて表示'}
                   </button>
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                    ランク
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setCreatorPrimeOnly((prev) => !prev)}
+                    className={`w-full border rounded-2xl px-4 py-3 text-left font-medium transition ${
+                      creatorPrimeOnly
+                        ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {creatorPrimeOnly ? 'プライムのみ ✓' : 'すべて表示'}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -2033,7 +2079,18 @@ function ExchangePageContent() {
                               <p className="text-gray-500">
                                 @{creator.twitter_handle || '未設定'}
                               </p>
-                              <div className="mt-2">
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {(() => {
+                                  const rankChip = getCreatorRankChip(creator.rank)
+                                  return (
+                                    <span
+                                      className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${rankChip.className}`}
+                                    >
+                                      {rankChip.label}
+                                    </span>
+                                  )
+                                })()}
+
                                 {creator.is_accepting_orders === false ? (
                                   <span className="inline-flex px-3 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-bold">
                                     受付停止中
