@@ -65,6 +65,7 @@ type CreatorItem = {
   twitter_handle: string | null
   skills: string[] | string | null
   portfolio_urls: string[] | string | null
+  is_accepting_orders?: boolean | null
 }
 
 type ListingItem = {
@@ -211,6 +212,7 @@ function ExchangePageContent() {
   const [creatorNameKeyword, setCreatorNameKeyword] = useState('')
   const [creatorBioKeyword, setCreatorBioKeyword] = useState('')
   const [creatorSkillKeyword, setCreatorSkillKeyword] = useState('')
+  const [creatorAcceptingOnly, setCreatorAcceptingOnly] = useState(false)
 
   const [listingCategoryId, setListingCategoryId] = useState('')
   const [listingTitleKeyword, setListingTitleKeyword] = useState('')
@@ -390,7 +392,7 @@ function ExchangePageContent() {
 
       const { data: creatorRows, error: creatorsError } = await supabase
         .from('users')
-        .select('id, display_name, bio, twitter_handle, skills, portfolio_urls')
+        .select('id, display_name, bio, twitter_handle, skills, portfolio_urls, is_accepting_orders')
         .order('created_at', { ascending: false })
 
       if (creatorsError) {
@@ -931,13 +933,17 @@ function ExchangePageContent() {
         creatorSkillKeyword.trim() === '' ||
         skillsText.toLowerCase().includes(creatorSkillKeyword.toLowerCase())
 
+      const matchAccepting =
+        !creatorAcceptingOnly || creator.is_accepting_orders !== false
+
       return (
         matchCategory &&
         matchParentCategory &&
         matchSkillTag &&
         matchName &&
         matchBio &&
-        matchSkill
+        matchSkill &&
+        matchAccepting
       )
     })
   }, [
@@ -1782,7 +1788,7 @@ function ExchangePageContent() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-2">
                     納品できる品目
@@ -1923,6 +1929,23 @@ function ExchangePageContent() {
                     className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-200"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                    受付状況
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setCreatorAcceptingOnly((prev) => !prev)}
+                    className={`w-full border rounded-2xl px-4 py-3 text-left font-medium transition ${
+                      creatorAcceptingOnly
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {creatorAcceptingOnly ? '受付中のみ ✓' : 'すべて表示'}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1960,6 +1983,17 @@ function ExchangePageContent() {
                               <p className="text-gray-500">
                                 @{creator.twitter_handle || '未設定'}
                               </p>
+                              <div className="mt-2">
+                                {creator.is_accepting_orders === false ? (
+                                  <span className="inline-flex px-3 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-bold">
+                                    受付停止中
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+                                    依頼受付中
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
 
@@ -2028,22 +2062,30 @@ function ExchangePageContent() {
                               価格表を見る
                             </Link>
 
-                            <button
-                              onClick={() => handleCreateConsultation(creator)}
-                              disabled={creatingConsultationCreatorId === creator.id}
-                              className="w-full bg-gray-900 hover:bg-black disabled:bg-gray-400 text-white py-4 rounded-2xl font-medium transition shadow-sm"
-                            >
-                              {creatingConsultationCreatorId === creator.id
-                                ? '相談を作成中...'
-                                : 'このクリエイターに相談する'}
-                            </button>
+                            {creator.is_accepting_orders === false ? (
+                              <div className="block w-full text-center border border-gray-200 text-gray-500 bg-gray-50 py-4 rounded-2xl font-medium">
+                                受付停止中
+                              </div>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => handleCreateConsultation(creator)}
+                                  disabled={creatingConsultationCreatorId === creator.id}
+                                  className="w-full bg-gray-900 hover:bg-black disabled:bg-gray-400 text-white py-4 rounded-2xl font-medium transition shadow-sm"
+                                >
+                                  {creatingConsultationCreatorId === creator.id
+                                    ? '相談を作成中...'
+                                    : 'このクリエイターに相談する'}
+                                </button>
 
-                            <Link
-                              href={`/request/new?creator_id=${creator.id}`}
-                              className="block w-full text-center bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 py-4 rounded-2xl font-medium transition"
-                            >
-                              このクリエイターに依頼する
-                            </Link>
+                                <Link
+                                  href={`/request/new?creator_id=${creator.id}`}
+                                  className="block w-full text-center bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 py-4 rounded-2xl font-medium transition"
+                                >
+                                  このクリエイターに依頼する
+                                </Link>
+                              </>
+                            )}
 
                             {portfolioUrl ? (
                               <a
