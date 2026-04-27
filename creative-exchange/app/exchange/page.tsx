@@ -683,7 +683,7 @@ function ExchangePageContent() {
   const getCreatorRankChip = (rank?: 'growth' | 'standard' | 'prime' | null) => {
     if (rank === 'prime') {
       return {
-        label: 'プライム認定',
+        label: 'プライム',
         className: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
       }
     }
@@ -696,7 +696,7 @@ function ExchangePageContent() {
     }
 
     return {
-      label: '成長中',
+      label: 'グロース',
       className: 'bg-gray-100 text-gray-600 border border-gray-200',
     }
   }
