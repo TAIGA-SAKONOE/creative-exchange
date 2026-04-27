@@ -5,6 +5,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import ProductMarketStatsCard from '../components/ProductMarketStatsCard'
+import EmptyState from '../components/EmptyState'
 
 type UserProfile = {
   id: string
@@ -1523,13 +1524,15 @@ function ExchangePageContent() {
             </div>
 
             {totalRequestListings === 0 ? (
-              <div className="bg-white rounded-3xl shadow-xl p-14 text-center">
-                <div className="text-5xl mb-4">🔎</div>
-                <h3 className="text-xl font-bold mb-2">募集中の工程・公開依頼が見つかりません</h3>
-                <p className="text-gray-500">
-                  検索条件をゆるめると、表示される場合があります
-                </p>
-              </div>
+              <EmptyState
+                icon="🔎"
+                title="募集中の工程・公開依頼が見つかりません"
+                message="検索条件をゆるめるか、カテゴリ・金額条件を外すと表示される場合があります。依頼者側なら、新しい依頼を作成して市場に出してみましょう。"
+                actionLabel="新しい依頼を作成"
+                actionHref="/request/new"
+                secondaryLabel="条件なしで見る"
+                secondaryHref="/exchange?tab=requests"
+              />
             ) : (
               <div className="grid gap-6">
                 {filteredOpenOrderSteps.map((step) => {
