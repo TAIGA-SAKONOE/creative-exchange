@@ -284,7 +284,8 @@ function ExchangePageContent() {
       }
 
       if (!authUser) {
-        window.location.href = '/login'
+        const currentPath = `${window.location.pathname}${window.location.search}`
+        window.location.href = `/login?redirect_to=${encodeURIComponent(currentPath)}`
         return
       }
 
@@ -1065,7 +1066,8 @@ function ExchangePageContent() {
 
   const handleAccept = async (orderId: string) => {
     if (!currentUser?.id) {
-      window.location.href = '/login'
+      const currentPath = `${window.location.pathname}${window.location.search}`
+      window.location.href = `/login?redirect_to=${encodeURIComponent(currentPath)}`
       return
     }
 
@@ -1126,7 +1128,8 @@ function ExchangePageContent() {
 
   const handleApplyStep = async (stepId: string) => {
     if (!currentUser?.id) {
-      window.location.href = '/login'
+      const currentPath = `${window.location.pathname}${window.location.search}`
+      window.location.href = `/login?redirect_to=${encodeURIComponent(currentPath)}`
       return
     }
 
@@ -1209,7 +1212,8 @@ function ExchangePageContent() {
 
   const handleCreateConsultation = async (creator: CreatorItem) => {
     if (!currentUser?.id) {
-      window.location.href = '/login'
+      const currentPath = `${window.location.pathname}${window.location.search}`
+      window.location.href = `/login?redirect_to=${encodeURIComponent(currentPath)}`
       return
     }
 
@@ -1265,7 +1269,8 @@ function ExchangePageContent() {
 
   const handleBuyListing = async (listingId: string) => {
     if (!currentUser?.id) {
-      window.location.href = '/login'
+      const currentPath = `${window.location.pathname}${window.location.search}`
+      window.location.href = `/login?redirect_to=${encodeURIComponent(currentPath)}`
       return
     }
 
