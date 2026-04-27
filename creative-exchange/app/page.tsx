@@ -17,20 +17,35 @@ const features = [
   {
     title: '相場が見える',
     description:
-      '受託相場・作品相場をカテゴリ別に表示。取引件数や信頼度を見ながら、価格の目安を確認できます。',
+      'カテゴリ別の受託相場・作品相場を確認できます。価格の目安が見えることで、安すぎる受注や高すぎる発注を避けやすくなります。',
     icon: '📈',
   },
   {
-    title: '工程で管理',
+    title: '実績が積み上がる',
     description:
-      '作詞・イラスト・動画編集など、複数クリエイターの分業を工程ごとに募集・受注・納品・検収できます。',
-    icon: '🧩',
+      '依頼・受注・納品・検収・レビューの履歴が信用として残ります。クリエイターは実力を、依頼者は誠実な取引姿勢を市場で示せます。',
+    icon: '🏛️',
   },
   {
-    title: '安心して取引',
+    title: '取引が保証される',
     description:
-      '事前相談、メッセージ、納品ファイル、検収、レビューまでを一箇所にまとめて管理できます。',
+      '事前相談、工程管理、納品ファイル、検収、レビューまでを一箇所で管理。曖昧なやり取りを減らし、安全な取引を支えます。',
     icon: '🛡️',
+  },
+]
+
+const proofPoints = [
+  {
+    title: '価格の透明化',
+    body: 'カテゴリごとの相場を見ながら依頼・受注できます。',
+  },
+  {
+    title: '工程の見える化',
+    body: '分業制作でも、募集・受注・納品・検収を工程ごとに管理できます。',
+  },
+  {
+    title: '信用の蓄積',
+    body: 'レビューと取引履歴が、次の仕事につながる市場上の実績になります。',
   },
 ]
 
@@ -56,20 +71,24 @@ export default function HomePage() {
               <BrandMark />
             </div>
 
-            <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-gray-900 mb-6 leading-tight">
-              クリエイターのための
-              <br className="hidden md:block" />
-              クリエイティブ取引所
+            <p className="inline-flex items-center justify-center px-4 py-2 rounded-full bg-white/80 border border-blue-100 text-blue-700 text-sm font-bold shadow-sm mb-6">
+              Creative Exchange / クリエイティブ取引所
+            </p>
+
+            <h1 className="text-3xl md:text-6xl font-bold tracking-tight text-gray-900 mb-6 leading-tight">
+              クリエイターが、
+              <br />
+              実力を市場で証明する場所。
             </h1>
 
-            <p className="text-lg md:text-2xl text-gray-700 mb-6 font-medium">
-              依頼・受注・相場・作品販売をひとつの場所で。
+            <p className="text-lg md:text-2xl text-gray-700 mb-6 font-bold">
+              相場が見える。実績が積み上がる。取引が保証される。
             </p>
 
             <p className="text-base md:text-lg text-gray-600 leading-8 max-w-3xl mx-auto mb-10">
               Creative Exchangeは、同人・音楽・映像・イラスト制作など
-              サブカルチャーの取引を、相場を見ながら、工程まで管理して、
-              安全に進められるクリエイティブ取引プラットフォームです。
+              サブカルチャーの制作取引を、価格の透明性、工程管理、信用評価によって支える
+              クリエイティブ取引プラットフォームです。
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -93,11 +112,15 @@ export default function HomePage() {
 
       <section className="max-w-6xl mx-auto px-4 py-16 md:py-20">
         <div className="text-center mb-12">
+          <p className="text-sm font-bold text-blue-600 mb-3">
+            Market Proof
+          </p>
           <h2 className="text-3xl md:text-4xl font-bold mb-3">
-            取引に必要なものを、一つに。
+            取引を、才能の証明に変える。
           </h2>
-          <p className="text-gray-600">
-            価格の不透明さ、分業管理の煩雑さ、納品後の不安を減らします。
+          <p className="text-gray-600 leading-7 max-w-3xl mx-auto">
+            クリエイターの実力は、作品だけではなく、価格・納期・取引評価・継続実績にも表れます。
+            Creative Exchangeは、その実績を市場の中に積み上げていく場所です。
           </p>
         </div>
 
@@ -121,8 +144,27 @@ export default function HomePage() {
 
       <section className="bg-white border-y border-gray-100">
         <div className="max-w-6xl mx-auto px-4 py-16 md:py-20">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {proofPoints.map((point) => (
+              <div
+                key={point.title}
+                className="rounded-3xl border border-gray-100 bg-gray-50 p-7"
+              >
+                <h3 className="text-xl font-bold mb-3">{point.title}</h3>
+                <p className="text-gray-600 leading-7">{point.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white border-b border-gray-100">
+        <div className="max-w-6xl mx-auto px-4 py-16 md:py-20">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
             <div>
+              <p className="text-sm font-bold text-blue-600 mb-3">
+                Categories
+              </p>
               <h2 className="text-3xl md:text-4xl font-bold mb-3">
                 対応カテゴリ
               </h2>
@@ -161,12 +203,12 @@ export default function HomePage() {
           </div>
 
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            クリエイティブ取引を、もっと見えるものに。
+            クリエイターが、実力を市場で証明する場所。
           </h2>
 
           <p className="text-white/90 leading-8 mb-8 max-w-2xl mx-auto">
             まずはXでログインして、プロフィールを作成してください。
-            依頼を出す側でも、受ける側でも、すぐに使い始められます。
+            依頼を出す側でも、受ける側でも、相場と実績を確認しながら使い始められます。
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
