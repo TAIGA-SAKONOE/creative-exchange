@@ -391,6 +391,7 @@ export default function CreatorProfile() {
 
   const creatorName = creator.display_name || 'クリエイター'
   const isOwnProfile = currentUserProfile?.id && String(currentUserProfile.id) === String(creatorId)
+  const isAcceptingOrders = creator?.is_accepting_orders !== false
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -430,6 +431,15 @@ export default function CreatorProfile() {
                     {creator.rank === 'prime' && (
                       <span className="inline-flex px-3 py-1 rounded-full bg-yellow-100 text-yellow-800 text-sm font-bold">
                         プライム認定
+                      </span>
+                    )}
+                    {isAcceptingOrders ? (
+                      <span className="inline-flex px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-sm font-bold">
+                        依頼受付中
+                      </span>
+                    ) : (
+                      <span className="inline-flex px-3 py-1 rounded-full bg-gray-100 text-gray-600 text-sm font-bold">
+                        受付停止中
                       </span>
                     )}
                   </div>
@@ -745,20 +755,31 @@ export default function CreatorProfile() {
 
             {/* アクション */}
             {!isOwnProfile && (
-              <div className="border-t pt-10 mt-12 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button
-                  onClick={handleCreateConsultation}
-                  disabled={creatingConsultation}
-                  className="w-full bg-gray-900 hover:bg-black disabled:bg-gray-400 text-white py-4 rounded-2xl font-bold transition"
-                >
-                  {creatingConsultation ? '相談を作成中...' : 'このクリエイターに相談する'}
-                </button>
-                <Link
-                  href={`/request/new?creator_id=${creatorId}&type=named`}
-                  className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold transition"
-                >
-                  このクリエイターに依頼する
-                </Link>
+              <div className="border-t pt-10 mt-12">
+                {isAcceptingOrders ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button
+                      onClick={handleCreateConsultation}
+                      disabled={creatingConsultation}
+                      className="w-full bg-gray-900 hover:bg-black disabled:bg-gray-400 text-white py-4 rounded-2xl font-bold transition"
+                    >
+                      {creatingConsultation ? '相談を作成中...' : 'このクリエイターに相談する'}
+                    </button>
+                    <Link
+                      href={`/request/new?creator_id=${creatorId}&type=named`}
+                      className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold transition"
+                    >
+                      このクリエイターに依頼する
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center">
+                    <p className="font-bold text-gray-900 mb-2">現在、依頼受付を停止しています</p>
+                    <p className="text-sm text-gray-500">
+                      このクリエイターは一時的に新規依頼の受付を停止しています。
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
