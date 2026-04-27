@@ -4,6 +4,8 @@ import { createClient } from '../../lib/supabase/client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import EmptyState from '../components/EmptyState'
+import LoadingState from '../components/LoadingState'
 
 export default function MyPage() {
   const router = useRouter()
@@ -305,9 +307,11 @@ export default function MyPage() {
           </div>
 
           {notifications.length === 0 ? (
-            <div className="text-center py-16 text-gray-500">
-              まだ通知はありません
-            </div>
+            <EmptyState
+              icon="🔔"
+              title="まだ通知はありません"
+              message="応募、採用、納品、検収、メッセージなどの動きがあるとここに表示されます。"
+            />
           ) : (
             <div className="grid gap-4 max-h-[420px] overflow-y-auto pr-2">
               {notifications.map((notification) => {
@@ -373,11 +377,15 @@ export default function MyPage() {
           </div>
 
           {requests.length === 0 ? (
-            <div className="text-center py-20 text-gray-500">
-              まだ依頼がありません
-              <br />
-              「新しい依頼を作成」から初めてみましょう
-            </div>
+            <EmptyState
+              icon="📝"
+              title="まだ依頼がありません"
+              message="依頼を作成すると、進行状況・応募・納品・検収をここで確認できます。"
+              actionLabel="新しい依頼を作成"
+              actionHref="/request/new"
+              secondaryLabel="相場を見る"
+              secondaryHref="/market"
+            />
           ) : (
             <div className="grid gap-6 max-h-[520px] overflow-y-auto pr-2">
               {requests.map((req) => (
@@ -423,11 +431,15 @@ export default function MyPage() {
           </div>
 
           {receivedOrders.length === 0 ? (
-            <div className="text-center py-20 text-gray-500">
-              まだ受注した依頼がありません
-              <br />
-              Exchange から公開依頼を探してみましょう
-            </div>
+            <EmptyState
+              icon="🤝"
+              title="まだ受注した依頼がありません"
+              message="公開依頼に応募したり、プロフィールを整えると受注機会が増えます。"
+              actionLabel="公開依頼を探す"
+              actionHref="/exchange?tab=requests"
+              secondaryLabel="プロフィールを編集"
+              secondaryHref="/profile/edit"
+            />
           ) : (
             <div className="grid gap-6 max-h-[520px] overflow-y-auto pr-2">
               {receivedOrders.map((order) => (
