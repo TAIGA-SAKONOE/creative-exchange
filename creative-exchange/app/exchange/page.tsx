@@ -29,6 +29,7 @@ type OrderItem = {
   created_at: string
   is_multi_step?: boolean | null
   total_steps?: number | null
+  order_type?: 'simple' | 'standard' | 'multi_step' | 'competition' | null
   categories?: CategoryValue
 }
 
@@ -54,6 +55,7 @@ type OrderStepListingItem = {
     status: string
     is_multi_step: boolean | null
     total_steps: number | null
+    order_type?: 'simple' | 'standard' | 'multi_step' | 'competition' | null
     categories?: CategoryValue
   } | null
 }
@@ -338,6 +340,7 @@ function ExchangePageContent() {
           created_at,
           is_multi_step,
           total_steps,
+          order_type,
           categories(name)
         `)
         .eq('status', 'open')
@@ -375,6 +378,7 @@ function ExchangePageContent() {
             status,
             is_multi_step,
             total_steps,
+            order_type,
             categories(name)
           )
         `)
@@ -638,6 +642,39 @@ function ExchangePageContent() {
     return {
       label: '公開中',
       className: 'bg-green-50 text-green-700 border border-green-100',
+    }
+  }
+
+  const getOrderTypeChip = (
+    orderType?: 'simple' | 'standard' | 'multi_step' | 'competition' | null,
+    isMultiStep?: boolean | null
+  ) => {
+    const normalizedType = orderType || (isMultiStep ? 'multi_step' : 'standard')
+
+    if (normalizedType === 'simple') {
+      return {
+        label: 'かんたん依頼',
+        className: 'bg-blue-50 text-blue-700 border border-blue-100',
+      }
+    }
+
+    if (normalizedType === 'multi_step') {
+      return {
+        label: '工程管理依頼',
+        className: 'bg-purple-50 text-purple-700 border border-purple-100',
+      }
+    }
+
+    if (normalizedType === 'competition') {
+      return {
+        label: 'コンペ依頼',
+        className: 'bg-pink-50 text-pink-700 border border-pink-100',
+      }
+    }
+
+    return {
+      label: '通常依頼',
+      className: 'bg-gray-100 text-gray-700 border border-gray-200',
     }
   }
 
@@ -1466,6 +1503,10 @@ function ExchangePageContent() {
                   const isOwnOrder =
                     currentUser?.id && parentOrder?.client_id === currentUser.id
                   const categoryName = getCategoryName(step)
+                  const typeChip = getOrderTypeChip(
+                    step.orders?.order_type,
+                    step.orders?.is_multi_step
+                  )
 
                   return (
                     <div
@@ -1475,6 +1516,12 @@ function ExchangePageContent() {
                       <div className="flex flex-col xl:flex-row xl:items-stretch gap-8">
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-3 mb-5">
+                            <span
+                              className={`inline-flex px-4 py-1.5 rounded-full text-sm font-medium ${typeChip.className}`}
+                            >
+                              {typeChip.label}
+                            </span>
+
                             <span className="inline-flex px-4 py-1.5 rounded-full bg-blue-600 text-white text-sm font-medium">
                               工程募集
                             </span>
@@ -1573,6 +1620,7 @@ function ExchangePageContent() {
                     !order.creator_id &&
                     !isOwnOrder
                   const statusChip = getOrderStatusChip(order)
+                  const typeChip = getOrderTypeChip(order.order_type, order.is_multi_step)
 
                   return (
                     <div
@@ -1582,8 +1630,10 @@ function ExchangePageContent() {
                       <div className="flex flex-col xl:flex-row xl:items-stretch gap-8">
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-3 mb-5">
-                            <span className="inline-flex px-4 py-1.5 rounded-full bg-gray-100 text-gray-700 text-sm font-medium border border-gray-200">
-                              通常依頼
+                            <span
+                              className={`inline-flex px-4 py-1.5 rounded-full text-sm font-medium ${typeChip.className}`}
+                            >
+                              {typeChip.label}
                             </span>
 
                             <span className="inline-flex px-4 py-1.5 rounded-full bg-blue-50 text-blue-700 text-sm font-medium border border-blue-100">
