@@ -36,22 +36,11 @@ const features = [
 
 function BrandMark() {
   return (
-    <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-3xl bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500 shadow-xl flex items-center justify-center overflow-hidden">
-      <div className="absolute inset-0 bg-white/10" />
-
-      <div className="absolute -top-5 -right-5 w-16 h-16 rounded-full bg-white/20" />
-      <div className="absolute -bottom-6 -left-6 w-20 h-20 rounded-full bg-black/10" />
-
-      <div className="relative z-10 text-white font-black text-2xl md:text-3xl tracking-tight">
-        CE
-      </div>
-
-      <div className="absolute bottom-5 left-5 right-5 h-6">
-        <div className="absolute bottom-0 left-0 w-3 h-2 rounded-sm bg-white/50" />
-        <div className="absolute bottom-0 left-5 w-3 h-4 rounded-sm bg-white/60" />
-        <div className="absolute bottom-0 left-10 w-3 h-6 rounded-sm bg-white/70" />
-      </div>
-    </div>
+    <img
+      src="/logo-full.png"
+      alt="Creative Exchange"
+      className="w-64 md:w-80 h-auto"
+    />
   )
 }
 
@@ -65,15 +54,6 @@ export default function HomePage() {
           <div className="max-w-4xl mx-auto text-center">
             <div className="flex flex-col items-center mb-8">
               <BrandMark />
-
-              <div className="mt-5">
-                <div className="text-2xl md:text-3xl font-black tracking-tight text-gray-900">
-                  Creative Exchange
-                </div>
-                <div className="mt-2 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-xs md:text-sm font-medium">
-                  Creative Trading Platform
-                </div>
-              </div>
             </div>
 
             <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-gray-900 mb-6 leading-tight">
