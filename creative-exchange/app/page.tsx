@@ -91,21 +91,32 @@ export default function HomePage() {
               クリエイティブ取引プラットフォームです。
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
               <Link
-                href="/login"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-bold transition shadow-sm"
+                href="/request/new?type=simple"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-4 rounded-2xl font-bold transition shadow-sm"
               >
-                はじめる（無料）
+                かんたん依頼を作る
+              </Link>
+
+              <Link
+                href="/exchange?tab=creators"
+                className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-900 px-6 py-4 rounded-2xl font-bold transition shadow-sm"
+              >
+                クリエイターを探す
               </Link>
 
               <Link
                 href="/market"
-                className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-900 px-8 py-4 rounded-2xl font-bold transition shadow-sm"
+                className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-900 px-6 py-4 rounded-2xl font-bold transition shadow-sm"
               >
                 相場を見る
               </Link>
             </div>
+
+            <p className="mt-5 text-sm text-gray-500">
+              まずは軽く依頼する、相手を探す、相場だけ確認する。目的に合わせてすぐ始められます。
+            </p>
           </div>
         </div>
       </section>
@@ -155,6 +166,77 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="max-w-6xl mx-auto px-4 py-16 md:py-20">
+        <div className="text-center mb-12">
+          <p className="text-sm font-bold text-blue-600 mb-3">
+            Start Routes
+          </p>
+          <h2 className="text-3xl md:text-4xl font-bold mb-3">
+            目的に合わせて、すぐ使い始める。
+          </h2>
+          <p className="text-gray-600 leading-7 max-w-3xl mx-auto">
+            依頼したい人、探したい人、まず相場を見たい人。
+            Creative Exchangeは、入口を分けて迷わず進めるようにしています。
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Link
+            href="/request/new?type=simple"
+            className="group bg-white rounded-3xl shadow p-8 border border-blue-100 hover:shadow-xl transition"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center text-3xl mb-6">
+              ⚡
+            </div>
+            <h3 className="text-xl font-bold mb-3 group-hover:text-blue-600">
+              かんたん依頼を作る
+            </h3>
+            <p className="text-gray-600 leading-7 mb-5">
+              修正なし前提・単一工程のライトな依頼を作成します。まず小さく頼みたいときに向いています。
+            </p>
+            <span className="inline-flex text-blue-600 font-bold">
+              依頼作成へ →
+            </span>
+          </Link>
+
+          <Link
+            href="/exchange?tab=creators"
+            className="group bg-white rounded-3xl shadow p-8 border border-gray-100 hover:shadow-xl transition"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-purple-50 flex items-center justify-center text-3xl mb-6">
+              🎨
+            </div>
+            <h3 className="text-xl font-bold mb-3 group-hover:text-purple-600">
+              クリエイターを探す
+            </h3>
+            <p className="text-gray-600 leading-7 mb-5">
+              品目・スキル・受付状況・ランクから、依頼先候補を探せます。
+            </p>
+            <span className="inline-flex text-purple-600 font-bold">
+              クリエイター一覧へ →
+            </span>
+          </Link>
+
+          <Link
+            href="/market"
+            className="group bg-white rounded-3xl shadow p-8 border border-gray-100 hover:shadow-xl transition"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center text-3xl mb-6">
+              📊
+            </div>
+            <h3 className="text-xl font-bold mb-3 group-hover:text-emerald-600">
+              相場を見る
+            </h3>
+            <p className="text-gray-600 leading-7 mb-5">
+              カテゴリ別の価格帯を確認し、依頼金額や受注価格の目安をつかめます。
+            </p>
+            <span className="inline-flex text-emerald-600 font-bold">
+              相場ボードへ →
+            </span>
+          </Link>
         </div>
       </section>
 
@@ -211,19 +293,26 @@ export default function HomePage() {
             依頼を出す側でも、受ける側でも、相場と実績を確認しながら使い始められます。
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
             <Link
-              href="/login"
-              className="bg-white text-blue-700 hover:bg-blue-50 px-8 py-4 rounded-2xl font-bold transition"
+              href="/request/new?type=simple"
+              className="bg-white text-blue-700 hover:bg-blue-50 px-6 py-4 rounded-2xl font-bold transition"
             >
-              今すぐXでログインして始める
+              かんたん依頼を作る
+            </Link>
+
+            <Link
+              href="/exchange?tab=creators"
+              className="border border-white/40 hover:bg-white/10 text-white px-6 py-4 rounded-2xl font-bold transition"
+            >
+              クリエイターを探す
             </Link>
 
             <Link
               href="/market"
-              className="border border-white/40 hover:bg-white/10 text-white px-8 py-4 rounded-2xl font-bold transition"
+              className="border border-white/40 hover:bg-white/10 text-white px-6 py-4 rounded-2xl font-bold transition"
             >
-              相場ボードを見る
+              相場を見る
             </Link>
           </div>
         </div>
