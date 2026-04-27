@@ -1,75 +1,162 @@
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="max-w-4xl mx-auto px-4">
-        <div className="bg-white rounded-3xl shadow-xl p-10">
-          <h1 className="text-4xl font-bold mb-8">利用規約</h1>
+    <main className="min-h-screen bg-gray-50">
+      <section className="max-w-4xl mx-auto px-4 py-16">
+        <div className="bg-white border border-gray-100 rounded-3xl shadow-sm p-8 md:p-12">
+          <p className="text-sm font-bold text-blue-600 mb-3">
+            Terms of Service
+          </p>
 
-          <div className="space-y-8 text-gray-700 leading-8">
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
+            利用規約
+          </h1>
+
+          <p className="text-gray-600 leading-8 mb-10">
+            本規約は、Creative Exchange（以下「本サービス」といいます。）の利用条件を定めるものです。
+            本サービスを利用するすべてのユーザーは、本規約に同意したものとみなします。
+          </p>
+
+          <div className="space-y-10 text-gray-700 leading-8">
             <section>
-              <h2 className="text-xl font-bold mb-3">第1条（適用）</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">第1条（適用）</h2>
               <p>
-                本規約は、Creative Exchange（以下「本サービス」）の利用条件を定めるものです。
-                本サービスを利用するすべてのユーザーは、本規約に同意したものとみなします。
+                本規約は、本サービスの利用に関する運営者とユーザーとの間の一切の関係に適用されます。
+                運営者が本サービス上で掲載する各種ポリシー、ガイドライン、注意事項等は、本規約の一部を構成します。
               </p>
             </section>
 
             <section>
-              <h2 className="text-xl font-bold mb-3">第2条（本サービスの内容）</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">第2条（本サービスの内容）</h2>
               <p>
-                本サービスは、クリエイティブ制作に関する依頼、受注、納品、検収、評価、
-                相場情報の表示その他これらに付随する機能を提供するプラットフォームです。
+                本サービスは、クリエイティブ制作に関する依頼、受注、相談、納品、検収、評価、
+                相場情報の表示、工程管理、決済補助その他これらに付随する機能を提供するプラットフォームです。
+              </p>
+              <p className="mt-3">
+                本サービスは、ユーザー間の創作制作取引の機会、連絡、工程管理、記録、評価等を提供するものであり、
+                個別の制作契約は、原則として依頼者と受注者との間に成立します。
               </p>
             </section>
 
             <section>
-              <h2 className="text-xl font-bold mb-3">第3条（ユーザー登録）</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">第3条（ユーザー登録・アカウント管理）</h2>
               <p>
                 ユーザーは、本サービス所定の方法により登録を行うものとします。
                 登録情報に虚偽、不正確又は不完全な内容があってはなりません。
               </p>
+              <p className="mt-3">
+                ユーザーは、自己の責任においてアカウントを管理するものとし、
+                アカウントの不正利用、管理不十分、第三者利用等により生じた損害について、
+                運営者は、運営者の故意又は重過失による場合を除き責任を負いません。
+              </p>
             </section>
 
             <section>
-              <h2 className="text-xl font-bold mb-3">第4条（禁止事項）</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">第4条（依頼・受注・納品・検収）</h2>
+              <p>
+                依頼者は、制作内容、予算、納期、納品形式、利用範囲、修正条件その他必要な条件を明確にした上で依頼を作成するものとします。
+                受注者は、依頼内容を確認し、自己の責任において受注するものとします。
+              </p>
+              <p className="mt-3">
+                受注者は、合意された条件に従い制作物を納品し、依頼者は納品物を確認して検収を行います。
+                検収完了後の取扱いは、本規約、キャンセル・返金ポリシー、当事者間の合意及び本サービス上の表示に従います。
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">第5条（料金・手数料・支払い）</h2>
+              <p>
+                本サービスでは、ユーザー間取引に関する制作料金、サービス手数料、決済手数料その他必要な費用が発生する場合があります。
+                料金、手数料、支払方法、支払時期等は、本サービス上の表示、特定商取引法に基づく表記、
+                決済・仮払いについてのページその他運営者が定める条件に従います。
+              </p>
+              <p className="mt-3">
+                本サービスでは、取引金額に対して原則10%のサービス手数料を設定する方針です。
+                正式な手数料率、計算方法、負担者、消費税等の取扱いは、正式提供開始時の表示に従います。
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">第6条（決済・外部決済サービス）</h2>
+              <p>
+                本サービスは、決済処理のためにStripeその他の外部決済サービスを利用する場合があります。
+                ユーザーは、外部決済サービスの利用にあたり、当該サービス提供事業者の規約及びポリシーにも従うものとします。
+              </p>
+              <p className="mt-3">
+                現在、決済・仮払い機能はβ提供準備中です。正式提供開始前の取引条件、支払方法、返金条件等は、
+                運営者の案内又は当事者間の合意に従うものとします。
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">第7条（キャンセル・返金）</h2>
+              <p>
+                取引のキャンセル及び返金は、取引の進行状況、当事者間の合意、本サービス上の表示、
+                キャンセル・返金ポリシーその他運営者が定める条件に従います。
+              </p>
+              <p className="mt-3">
+                受注後、制作開始後、納品後、検収後等の各段階により、キャンセル及び返金の可否又は条件が異なる場合があります。
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">第8条（禁止事項）</h2>
               <ul className="list-disc pl-6 space-y-2">
                 <li>法令又は公序良俗に違反する行為</li>
                 <li>他者の知的財産権、名誉、信用、プライバシーその他の権利利益を侵害する行為</li>
                 <li>虚偽の情報を登録又は掲載する行為</li>
-                <li>不正アクセス、システムへの過度な負荷、リバースエンジニアリングその他本サービスの運営を妨害する行為</li>
-                <li>本サービスを通じた詐欺的行為又はこれに類する行為</li>
+                <li>不正アクセス、過度な負荷、リバースエンジニアリングその他本サービスの運営を妨害する行為</li>
+                <li>詐欺的行為、なりすまし、未払い、納品拒否、検収遅延その他これらに類する行為</li>
+                <li>権利侵害のおそれがある制作物、違法・有害・差別的・暴力的・公序良俗に反する内容の取引</li>
+                <li>運営者の承諾なく本サービス外での直接取引へ誘導し、本サービスの手数料又は記録機能を回避する行為</li>
                 <li>その他、運営者が不適切と判断する行為</li>
               </ul>
             </section>
 
             <section>
-              <h2 className="text-xl font-bold mb-3">第5条（投稿情報・取引情報）</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">第9条（投稿情報・取引情報）</h2>
               <p>
-                ユーザーは、本サービス上に掲載又は送信する文章、画像、ファイルその他一切の情報について、
-                自らが適法に利用又は提供する権限を有することを保証するものとします。
+                ユーザーは、本サービス上に掲載又は送信する文章、画像、ファイル、プロフィール、
+                ポートフォリオその他一切の情報について、自らが適法に利用又は提供する権限を有することを保証するものとします。
+              </p>
+              <p className="mt-3">
+                運営者は、本サービスの運営、改善、不正防止、相場情報又は統計情報の作成等に必要な範囲で、
+                投稿情報及び取引情報を利用できるものとします。ただし、個人情報の取扱いはプライバシーポリシーに従います。
               </p>
             </section>
 
             <section>
-              <h2 className="text-xl font-bold mb-3">第6条（知的財産権）</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">第10条（知的財産権・成果物の取扱い）</h2>
               <p>
-                本サービスに関するプログラム、デザイン、文章、ロゴその他の知的財産権は、
-                運営者又は正当な権利者に帰属します。
-                個別の制作物に関する権利の帰属は、当事者間の合意又は別途定める条件に従います。
+                本サービスに関するプログラム、デザイン、文章、ロゴその他の知的財産権は、運営者又は正当な権利者に帰属します。
+              </p>
+              <p className="mt-3">
+                個別の制作物に関する権利の帰属、利用範囲、二次利用、商用利用、著作者人格権の取扱い等は、
+                依頼者と受注者との間の合意、依頼内容、本サービス上の表示又は別途定める条件に従います。
               </p>
             </section>
 
             <section>
-              <h2 className="text-xl font-bold mb-3">第7条（免責）</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">第11条（レビュー・評価）</h2>
               <p>
-                運営者は、本サービスに事実上又は法律上の瑕疵がないことを保証しません。
-                また、ユーザー間の取引、紛争、損害等について、運営者に故意又は重過失がある場合を除き、
-                責任を負いません。
+                ユーザーは、取引完了後、相手方についてレビュー又は評価を投稿できる場合があります。
+                レビュー及び評価は、事実に基づき、誹謗中傷、虚偽、権利侵害その他不適切な内容を含んではなりません。
+              </p>
+              <p className="mt-3">
+                運営者は、不適切と判断したレビュー又は評価について、非表示、削除、修正依頼その他必要な措置を行うことができます。
               </p>
             </section>
 
             <section>
-              <h2 className="text-xl font-bold mb-3">第8条（サービス内容の変更・停止）</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">第12条（退会）</h2>
+              <p>
+                ユーザーは、本サービス所定の方法により退会できます。
+                ただし、進行中の取引、未払い、未納品、検収待ち、返金処理その他未了事項がある場合、
+                これらの処理が完了するまで退会又は一部機能の停止が制限される場合があります。
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">第13条（サービス内容の変更・停止）</h2>
               <p>
                 運営者は、必要と判断した場合、ユーザーへの事前通知なく、本サービスの内容変更、
                 一時停止又は終了を行うことができます。
@@ -77,7 +164,26 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-bold mb-3">第9条（規約の変更）</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">第14条（免責・責任制限）</h2>
+              <p>
+                運営者は、本サービスに事実上又は法律上の瑕疵がないことを保証しません。
+                また、ユーザー間の取引、紛争、損害等について、運営者の故意又は重過失による場合を除き責任を負いません。
+              </p>
+              <p className="mt-3">
+                ただし、消費者契約法その他の法令により免責又は責任制限が認められない場合は、この限りではありません。
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">第15条（反社会的勢力の排除）</h2>
+              <p>
+                ユーザーは、自己が反社会的勢力に該当しないこと、及び反社会的勢力と関係を有しないことを表明し、保証するものとします。
+                運営者は、ユーザーがこれに違反したと判断した場合、事前通知なく利用停止、登録抹消その他必要な措置を行うことができます。
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">第16条（規約の変更）</h2>
               <p>
                 運営者は、必要に応じて本規約を変更できます。
                 変更後の規約は、本サービス上に表示した時点又は別途定める時点から効力を生じます。
@@ -85,20 +191,20 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-bold mb-3">第10条（準拠法・管轄）</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">第17条（準拠法・管轄）</h2>
               <p>
                 本規約は日本法に準拠します。
                 本サービスに関して紛争が生じた場合には、運営者所在地を管轄する裁判所を
                 第一審の専属的合意管轄裁判所とします。
               </p>
             </section>
+          </div>
 
-            <section className="pt-4 text-sm text-gray-500">
-              制定日：2026年4月23日
-            </section>
+          <div className="mt-12 pt-6 border-t border-gray-100 text-sm text-gray-500">
+            制定日：2026年4月23日
           </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   )
 }
