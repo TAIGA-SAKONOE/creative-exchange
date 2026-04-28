@@ -454,7 +454,7 @@ export default function CreatorProfile() {
                 </div>
                 <div className="bg-white/15 border border-white/20 rounded-2xl px-5 py-4 backdrop-blur-sm">
                   <p className="text-xs opacity-80 mb-1">平均評価</p>
-                  <p className="text-2xl font-bold">{shouldShowRatings ? roundedCreatorAverageRating : '準備中'}</p>
+                  <p className="text-2xl font-bold">{shouldShowRatings ? roundedCreatorAverageRating : '集計待ち'}</p>
                 </div>
               </div>
             </div>
@@ -630,7 +630,7 @@ export default function CreatorProfile() {
 
               {!shouldShowRatings ? (
                 <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-2xl">
-                  評価準備中
+                  評価集計待ち
                   <br />
                   3件以上のレビューが蓄積されると評価スコアを表示します
                 </div>
