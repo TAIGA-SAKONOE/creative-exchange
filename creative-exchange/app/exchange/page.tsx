@@ -15,6 +15,7 @@ type UserProfile = {
   twitter_handle?: string | null
   skills?: string[] | string | null
   portfolio_urls?: string[] | string | null
+  avatar_url?: string | null
 }
 
 type CategoryValue = { name: string }[] | { name: string } | null
@@ -68,6 +69,7 @@ type CreatorItem = {
   twitter_handle: string | null
   skills: string[] | string | null
   portfolio_urls: string[] | string | null
+  avatar_url?: string | null
   is_accepting_orders?: boolean | null
   rank?: 'growth' | 'standard' | 'prime' | null
 }
@@ -292,7 +294,7 @@ function ExchangePageContent() {
 
       const { data: profile, error: profileError } = await supabase
         .from('users')
-        .select('id, auth_id, display_name, bio, twitter_handle, skills, portfolio_urls')
+        .select('id, auth_id, display_name, bio, twitter_handle, skills, portfolio_urls, avatar_url')
         .eq('auth_id', authUser.id)
         .single()
 
@@ -400,7 +402,7 @@ function ExchangePageContent() {
 
       const { data: creatorRows, error: creatorsError } = await supabase
         .from('users')
-        .select('id, display_name, bio, twitter_handle, skills, portfolio_urls, is_accepting_orders, rank')
+        .select('id, display_name, bio, twitter_handle, skills, portfolio_urls, avatar_url, is_accepting_orders, rank')
         .order('created_at', { ascending: false })
 
       if (creatorsError) {
@@ -1865,16 +1867,10 @@ function ExchangePageContent() {
                   </div>
 
                   <div className="w-full xl:w-80 shrink-0 flex flex-col">
-                    <div className="bg-gray-50 rounded-3xl p-6 mb-4 border border-gray-100">
-                      <p className="text-sm text-gray-500 mb-2">プロフィール状況</p>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-500">プロフィール閲覧</span>
-                          <span className="font-semibold text-gray-900">今後追加予定</span>
-                        </div>
+                    
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-500">価格表確認</span>
-                          <span className="font-semibold text-gray-900">導線あり</span>
+                          <span className="font-semibold text-gray-900">確認できます</span>
                         </div>
                       </div>
                     </div>
@@ -1898,7 +1894,7 @@ function ExchangePageContent() {
                         </a>
                       ) : (
                         <div className="block w-full text-center border border-gray-200 text-gray-400 py-4 rounded-2xl font-medium">
-                          ポートフォリオ未設定
+                          ポートフォリオ未登録
                         </div>
                       )}
                     </div>
@@ -2122,8 +2118,16 @@ function ExchangePageContent() {
                       <div className="flex flex-col xl:flex-row xl:items-stretch gap-8">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-4 mb-6">
-                            <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-2xl shadow-inner">
-                              👤
+                            <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-2xl shadow-inner overflow-hidden shrink-0">
+                              {creator.avatar_url ? (
+                                <img
+                                  src={creator.avatar_url}
+                                  alt={creator.display_name || 'クリエイター画像'}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <span>👤</span>
+                              )}
                             </div>
 
                             <div>
@@ -2152,6 +2156,12 @@ function ExchangePageContent() {
                                 ) : (
                                   <span className="inline-flex px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
                                     依頼受付中
+                                  </span>
+                                )}
+
+                                {portfolioUrl && (
+                                  <span className="inline-flex px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-bold">
+                                    ポートフォリオあり
                                   </span>
                                 )}
                               </div>
@@ -2208,12 +2218,7 @@ function ExchangePageContent() {
                         </div>
 
                         <div className="w-full xl:w-80 shrink-0 flex flex-col">
-                          <div className="bg-gray-50 rounded-3xl p-6 mb-4 border border-gray-100">
-                            <p className="text-sm text-gray-500 mb-2">プロフィール導線</p>
-                            <p className="text-lg font-semibold text-gray-900">
-                              価格表・相談・指名依頼へ進めます
-                            </p>
-                          </div>
+                          
 
                           <div className="space-y-3 mt-auto">
                             <Link
@@ -2259,7 +2264,7 @@ function ExchangePageContent() {
                               </a>
                             ) : (
                               <div className="block w-full text-center border border-gray-200 text-gray-400 py-4 rounded-2xl font-medium">
-                                ポートフォリオ未設定
+                                ポートフォリオ未登録
                               </div>
                             )}
                           </div>
