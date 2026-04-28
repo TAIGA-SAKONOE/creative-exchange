@@ -1800,8 +1800,16 @@ function ExchangePageContent() {
                 <div className="flex flex-col xl:flex-row xl:items-stretch gap-8">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-4 mb-6">
-                      <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center text-white text-2xl shadow-inner">
-                        👤
+                      <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center text-white text-2xl shadow-inner overflow-hidden shrink-0">
+                        {currentUser.avatar_url ? (
+                          <img
+                            src={currentUser.avatar_url}
+                            alt={currentUser.display_name || 'プロフィール画像'}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span>👤</span>
+                        )}
                       </div>
 
                       <div>
