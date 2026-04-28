@@ -224,7 +224,7 @@ export default function AppHeader() {
           <div className="flex items-center justify-between gap-4">
             <Link
               href="/"
-              className="flex items-center shrink-0"
+              className="flex items-center gap-3 shrink-0"
               onClick={closeAllMenus}
             >
               <img
@@ -232,6 +232,9 @@ export default function AppHeader() {
                 alt="Creative Exchange"
                 className="h-10 w-auto"
               />
+              <span className="hidden sm:inline-block font-bold text-lg md:text-xl text-gray-900 tracking-tight">
+                Creative Exchange
+              </span>
             </Link>
 
             <button
