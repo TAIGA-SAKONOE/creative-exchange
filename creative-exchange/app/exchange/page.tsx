@@ -1867,7 +1867,13 @@ function ExchangePageContent() {
                   </div>
 
                   <div className="w-full xl:w-80 shrink-0 flex flex-col">
-                    
+                    <div className="bg-gray-50 rounded-3xl p-6 mb-4 border border-gray-100">
+                      <p className="text-sm text-gray-500 mb-2">プロフィール確認</p>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-500">詳細プロフィール</span>
+                          <span className="font-semibold text-gray-900">詳細ページで確認できます</span>
+                        </div>
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-500">価格表確認</span>
                           <span className="font-semibold text-gray-900">確認できます</span>
@@ -2218,7 +2224,12 @@ function ExchangePageContent() {
                         </div>
 
                         <div className="w-full xl:w-80 shrink-0 flex flex-col">
-                          
+                          <div className="bg-gray-50 rounded-3xl p-6 mb-4 border border-gray-100">
+                            <p className="text-sm text-gray-500 mb-2">取引導線</p>
+                            <p className="text-lg font-semibold text-gray-900">
+                              価格表の確認・相談・指名依頼ができます
+                            </p>
+                          </div>
 
                           <div className="space-y-3 mt-auto">
                             <Link
