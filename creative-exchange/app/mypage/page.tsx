@@ -19,6 +19,12 @@ export default function MyPage() {
   const [loading, setLoading] = useState(true)
   const [userCategoryNames, setUserCategoryNames] = useState<string[]>([])
 
+  const portfolioUrls = Array.isArray(user?.portfolio_urls)
+    ? user.portfolio_urls.filter(Boolean)
+    : user?.portfolio_urls
+      ? [String(user.portfolio_urls)]
+      : []
+
   useEffect(() => {
     const loadMyPage = async () => {
       const supabase = createClient()
@@ -222,8 +228,16 @@ export default function MyPage() {
 
         <div className="bg-white rounded-3xl shadow-xl p-10 mb-12">
           <div className="flex items-center gap-8">
-            <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-blue-500 rounded-3xl flex items-center justify-center text-6xl text-white shadow-inner">
-              👤
+            <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-blue-500 rounded-3xl flex items-center justify-center text-5xl text-white shadow-inner overflow-hidden shrink-0">
+              {user.avatar_url ? (
+                <img
+                  src={user.avatar_url}
+                  alt={user.display_name || 'プロフィール画像'}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span>👤</span>
+              )}
             </div>
 
             <div className="flex-1">
@@ -265,6 +279,34 @@ export default function MyPage() {
                 <p className="text-gray-700 leading-relaxed">
                   {getSkillText(user.skills)}
                 </p>
+              </div>
+
+              <div className="mt-6">
+                <p className="text-sm font-medium text-gray-500 mb-2">
+                  ポートフォリオURL
+                </p>
+                {portfolioUrls.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {portfolioUrls.slice(0, 3).map((url: string) => (
+                      <a
+                        key={url}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex max-w-full items-center rounded-full border border-purple-100 bg-purple-50 px-3 py-1.5 text-sm font-medium text-purple-700 hover:bg-purple-100 transition"
+                      >
+                        <span className="truncate max-w-[260px]">{url}</span>
+                      </a>
+                    ))}
+                    {portfolioUrls.length > 3 && (
+                      <span className="inline-flex rounded-full bg-gray-100 px-3 py-1.5 text-sm text-gray-500">
+                        +{portfolioUrls.length - 3}件
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-gray-500">未設定</span>
+                )}
               </div>
             </div>
           </div>
