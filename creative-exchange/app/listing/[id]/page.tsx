@@ -60,7 +60,7 @@ export default function ListingDetail() {
     }
 
     const confirmed = window.confirm(
-      `「${listing.title}」を ¥${Number(listing.price).toLocaleString()} で購入しますか？\n\n※ 現在はテストモードのため、実際の決済は行われません。`
+      `「${listing.title}」を ¥${Number(listing.price).toLocaleString()} で購入しますか？\n\n※ 現在、作品購入機能はβ準備中です。正式な決済はまだ行われません。`
     )
     if (!confirmed) return
 
